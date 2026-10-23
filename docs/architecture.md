@@ -216,14 +216,8 @@ npm run format       # Prettier ; npm run check = typecheck + test + format:chec
 | Propriété intellectuelle                          | Rendu entièrement procédural, aucun code ni asset du client original ; ressources tierces déclarées avec leur licence.              |
 | Écosystème jeune (TypeScript 7, Vite 8, Vitest 5) | Versions verrouillées par le lockfile ; retour à TypeScript 5 possible sans changement de code.                                     |
 
-## 9. Licence : décision à prendre
+## 9. Licence
 
-Le dépôt n'a pas de licence de projet : par défaut, personne d'autre ne peut légalement réutiliser le code. Avis tiers à conserver quelle que soit la décision : polices Ubuntu (UFL-1.0, `assets/fonts/UFL.txt`, recopiée dans `dist/licenses/` à chaque build), drapeaux flag-icons (MIT) et icône Font Awesome Free (CC BY 4.0) sous `docs/research/asset-collection/distributable/`, non utilisés par le client à ce jour.
+Le code du projet est sous **AGPL-3.0-or-later**, conformément au choix de l’utilisateur. Le texte intégral figure dans [LICENSE](../LICENSE).
 
-Options pour le code :
-
-- **AGPL-3.0-or-later** : toute instance publique modifiée doit publier ses sources ; adapté si l'on veut que les forks hébergés restent ouverts.
-- **MIT** : réutilisation maximale, y compris fermée ; le plus simple.
-- **GPL-3.0-or-later** : copyleft sur la distribution, mais pas sur l'hébergement réseau.
-
-Recommandation : AGPL-3.0-or-later pour un jeu auto-hébergé dont on veut garder les serveurs modifiés ouverts, MIT si la simplicité prime. Le nom « diep-fried.io » évoque une marque existante : prévoir une identité visuelle propre et vérifier le nom avant toute diffusion publique.
+Les ressources tierces conservent leur licence : Ubuntu (UFL-1.0), drapeaux flag-icons (MIT) et icône Font Awesome Free (CC BY 4.0). Les avis et textes associés sont conservés dans leurs répertoires et dans les notices du build client. Les références propriétaires locales sont exclues de Git et de la distribution.
