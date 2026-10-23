@@ -7,7 +7,7 @@ import {
   type RoomCode,
   type RoomOptions,
 } from '@diep-fried/shared';
-import type { SimulationFactory } from '@diep-fried/sim';
+import { prepareModeConfig, type SimulationFactory } from '@diep-fried/sim';
 import { Room } from './room';
 
 export class RoomManager {
@@ -58,11 +58,13 @@ export class RoomManager {
     }
     if (this.rooms.size >= this.options.maxRooms) return null;
     const code = this.uniqueCode();
+    const seed = randomInt(2 ** 32);
+    const config = prepareModeConfig(resolveModeConfig(mode, options), seed);
     const room = new Room(
       code,
-      resolveModeConfig(mode, options),
+      config,
       this.options.simulationFactory,
-      randomInt(2 ** 32),
+      seed,
       this.options.resumeGraceMs,
     );
     this.rooms.set(code, room);

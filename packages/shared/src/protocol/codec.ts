@@ -109,6 +109,16 @@ function readCommand(value: unknown): PlayerCommand {
       return { type: 'chooseClass', classId: value.classId };
     case 'respawn':
       return { type: 'respawn' };
+    case 'sandbox':
+      return {
+        type: 'sandbox',
+        action: readEnum(value.action, 'sandbox.action', [
+          'levelUp',
+          'cycleClass',
+          'selfDestruct',
+          'toggleGod',
+        ]),
+      };
     default:
       throw new ValidationError('commande inconnue');
   }

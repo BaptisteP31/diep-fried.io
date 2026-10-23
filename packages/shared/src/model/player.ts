@@ -25,7 +25,9 @@ export interface PlayerInput {
 export type PlayerCommand =
   | { type: 'upgradeStat'; stat: StatId }
   | { type: 'chooseClass'; classId: ClassId }
-  | { type: 'respawn' };
+  | { type: 'respawn' }
+  /** Extension additive du protocole v1 ; autorisation uniquement par config.sandbox.cheats. */
+  | { type: 'sandbox'; action: 'levelUp' | 'cycleClass' | 'selfDestruct' | 'toggleGod' };
 
 /** État privé du joueur destinataire d'un snapshot. */
 export interface SelfState {

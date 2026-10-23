@@ -2,10 +2,9 @@ import type { Rect } from './geometry';
 import type { TeamId } from './ids';
 
 /**
- * Modes implémentés. Les modes prévus (`teams2`, `teams4`, `maze`, `domination`...) seront
- * ajoutés ici avec leur preset ; leurs besoins sont déjà couverts par `ModeConfig`.
+ * Modes implémentés. Les modes à objectifs restent des extensions futures.
  */
-export const MODE_IDS = ['ffa', 'sandbox'] as const;
+export const MODE_IDS = ['ffa', 'sandbox', 'teams2', 'teams4', 'maze'] as const;
 
 export type ModeId = (typeof MODE_IDS)[number];
 

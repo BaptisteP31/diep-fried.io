@@ -14,6 +14,8 @@ export interface ModeContext {
   readonly config: ModeConfig;
   readonly rng: Rng;
   readonly tick: Tick;
+  /** Comptage des joueurs connectés, morts compris ; optionnel pour les anciens appelants. */
+  readonly teamSizes?: ReadonlyMap<TeamId, number>;
 }
 
 /**
@@ -42,7 +44,32 @@ const freeForAll: Omit<ModeRules, 'id'> = {
   canDamage: (ctx, attacker, target) => attacker !== target || ctx.config.friendlyFire,
 };
 
+const teams: Omit<ModeRules, 'id'> = {
+  ...freeForAll,
+  assignTeam: (ctx, playerId) => {
+    let best = ctx.config.teams[0]?.id;
+    if (best === undefined) return freeForAll.assignTeam(ctx, playerId);
+    for (const team of ctx.config.teams)
+      if ((ctx.teamSizes?.get(team.id) ?? 0) < (ctx.teamSizes?.get(best) ?? 0)) best = team.id;
+    return best;
+  },
+  spawnPoint: (ctx, team, radius) => {
+    const zone =
+      ctx.config.map.zones.find((zone) => zone.kind === 'spawn' && zone.team === team) ??
+      ctx.config.map.zones.find((zone) => zone.kind === 'base' && zone.team === team);
+    if (!zone) return freeForAll.spawnPoint(ctx, team, radius);
+    const { x, y, width, height } = zone.area;
+    return {
+      x: ctx.rng.range(x + Math.min(radius, width / 2), x + width - Math.min(radius, width / 2)),
+      y: ctx.rng.range(y + Math.min(radius, height / 2), y + height - Math.min(radius, height / 2)),
+    };
+  },
+};
+
 export const MODE_RULES: Readonly<Record<ModeId, ModeRules>> = {
   ffa: { id: 'ffa', ...freeForAll },
   sandbox: { id: 'sandbox', ...freeForAll },
+  maze: { id: 'maze', ...freeForAll },
+  teams2: { id: 'teams2', ...teams },
+  teams4: { id: 'teams4', ...teams },
 };

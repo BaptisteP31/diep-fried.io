@@ -1,6 +1,6 @@
 # Architecture de diep-fried.io
 
-État : contrats du jalon 1, simulation de classes du jalon 3 (ajouts optionnels ci-dessous). Ce document fait référence pour l'API partagée ; toute modification d'un contrat listé ici passe par le coordinateur et met ce fichier à jour dans le même commit.
+État : contrats v1, 54 classes jouables, modes FFA/Sandbox/Teams/Maze (extensions additives ci-dessous). Ce document fait référence pour l'API partagée ; toute modification d'un contrat listé ici passe par le coordinateur et met ce fichier à jour dans le même commit.
 
 Rappel : toutes les constantes numériques du dépôt (tick, tailles, santé, vitesses, délais, densités) sont des **choix de diep-fried.io**, pas des mesures du jeu original. Seules les couleurs de `apps/client/src/render/palette.ts` proviennent du relevé `docs/research/rendering-assets/verified-css-tokens.json`.
 
@@ -73,13 +73,14 @@ Les définitions TypeScript font foi ; cette section résume leur sens. Point d'
 - `STAT_IDS` : ordre contractuel des 8 statistiques (touches 1 à 8) : `healthRegen, maxHealth, bodyDamage, bulletSpeed, bulletPenetration, bulletDamage, reload, movementSpeed`.
 - `EntityState = TankState | ProjectileState | ShapeState`, discriminée par `kind`. Champs communs : `id, x, y, vx, vy, angle, radius, team`.
   - `TankState` : `playerId | null`, `name`, `classId`, `level`, `score`, `health`, `maxHealth`, `opacity`, `barrelShots` (tick du dernier tir par canon, pour le recul visuel), `spawnProtected`. Ajouts optionnels : `barrelAngles` (orientations monde des canons autonomes, tableau de même longueur que `barrelShots`) et `cameraOffset: { x, y }` (décalage monde demandé par Predator + Alt). Le filtre serveur suit ce décalage ; le rendu client doit encore le consommer.
-  - `ProjectileState` : `family` (`bullet | drone | trap | missile | minion`), `ownerId`, `health?`, `maxHealth?`. Ajouts optionnels : `bodyShape?: circle | triangle | square`, `classId?` (classe de lancement), `barrelShots?` pour missiles/minions. Les tirs secondaires gardent comme `ownerId` le tank racine, pour attribution, équipes et nettoyage. Tous ces ajouts sont facultatifs ; les anciens snapshots restent valides, sans changement de version ni de commande/codec.
+  - `ProjectileState` : `family` (`bullet | drone | trap | missile | minion`), `ownerId`, `health?`, `maxHealth?`. Ajouts optionnels : `bodyShape?: circle | triangle | square`, `classId?` (classe de lancement), `barrelShots?` pour missiles/minions. Les tirs secondaires gardent comme `ownerId` le tank racine, pour attribution, équipes et nettoyage. Tous ces ajouts sont facultatifs ; les anciens snapshots restent valides, sans changement de version.
   - `ShapeState` : `shape` (`square | triangle | pentagon | alphaPentagon | crasher`), `shiny`, `health`, `maxHealth`.
 - `PlayerInput` : `{ seq, move: {x,y} ∈ [-1,1]², aim: {x,y} relatif au tank (≤ 10 000), fire, alt }`. État maintenu, valable jusqu'au suivant ; `seq` strictement croissant par connexion (des trous sont permis).
-- `PlayerCommand` : `upgradeStat { stat }`, `chooseClass { classId }`, `respawn`. Validées par la simulation, ignorées si impossibles.
+- `PlayerCommand` : `upgradeStat { stat }`, `chooseClass { classId }`, `respawn`, ajout v1 `sandbox { action: levelUp | cycleClass | selfDestruct | toggleGod }`. Le codec valide strictement les quatre actions ; seule la simulation autorise une triche si `config.sandbox.cheats` et tank vivant. Toute commande impossible/non autorisée est ignorée.
 - `SnapshotPayload` : `{ tick, ackSeq, self: SelfState, entities, leaderboard? }`. Une entité absente a disparu ou est hors de vue : le client peut l'estomper localement.
 - `SelfState` : `playerId, entityId | null, alive, classId, level, score, levelProgress (0..1), statPoints, stats, statCaps, classChoices, view, respawnTick | null`. `view` = demi-étendue visible en unités monde sur le plus grand axe de l'écran.
 - `DeathInfo` : `playerId, tick, killerName | null, score, level, classId, respawnTick`.
+- `MODE_IDS = [ffa, sandbox, teams2, teams4, maze]` (extension additive v1).
 - `ModeConfig` : configuration résolue d'un salon (`mode, tickRate, snapshotInterval, arena, maxPlayers, teams, friendlyFire, map { walls, zones }, shapes { targetCount }, progression { maxLevel, startLevel, scoreKeptOnDeath }, respawn { delayTicks }, sandbox { cheats }`).
 - `RoomOptions` : réglages demandables à la création (`maxPlayers?`, `arenaSize?: small|medium|large`, `shapeDensity?: low|normal|high`), bornés par `resolveModeConfig`.
 
@@ -129,7 +130,7 @@ type SimulationFactory = (options: { config: ModeConfig; seed: number }) => Simu
 
 - Le serveur possède l'horloge (`FixedStepClock`, rattrapage limité à 5 ticks par appel, retard au-delà abandonné et compté) ; la simulation ne lit jamais l'heure.
 - Ordre recommandé d'un `step()` : intentions et commandes → mouvement/accélération/frottement → tirs → collisions (partition spatiale) → dégâts → morts et récompenses → règles de mode → apparitions (formes, réapparitions).
-- `ModeRules` (`assignTeam`, `spawnPoint`, `canDamage`) isole ce qui varie selon le mode ; FFA et Sandbox sont implémentés.
+- `ModeRules` (`assignTeam`, `spawnPoint`, `canDamage`) isole ce qui varie selon le mode ; FFA, Sandbox, Teams 2/4 et Maze sont implémentés. `ModeContext.teamSizes?` ajoute un comptage optionnel des camps (morts connectés inclus), sans changer `Simulation`.
 - `createPlaceholderSimulation` : tank immobile par joueur, orientation de visée appliquée, aucune règle de jeu. Il sert à faire tourner serveur et client en attendant la simulation complète, qui le remplace derrière la même interface.
 - `packages/sim/test/simulation-contract.ts` fournit `describeSimulationContract(nom, fabrique)` : toute implémentation doit passer cette suite (ticks, apparition, bornes de l'arène, `ackSeq`, joueurs inconnus, déterminisme).
 
@@ -138,7 +139,7 @@ type SimulationFactory = (options: { config: ModeConfig; seed: number }) => Simu
 - `ClassDefinition` : `id, name, level, upgradesTo, barrels, statCaps?, view, speed, droneLimit?`. Paramètres optionnels de classe : `dronesPerReload`, `bodyHealth`, `bodyDamage`, `mass`, `stealth { delay, fade }`, `altCameraDistance`.
 - `BarrelDefinition` (repère local, unités = rayon du corps) : `angle, offset, length, width, tipWidth?, delay, projectile` et multiplicateurs `reload, damage, penetration, speed, spread, recoil`. La même définition sert à la simulation (tirs) et au rendu (canons, vignettes, arbre). Paramètres optionnels de canon : `pellets`, `auto`, `autonomous`, `conversionOnly`, `lifetime`, `radius`, `missile` (`skimmer | rocketeer | glider | firework`).
 - `STARTING_CLASS = 'tank'` ; 54 classes du catalogue sont définies, réparties 1/4/13/36 aux niveaux 1/15/30/45, toutes accessibles par des arêtes validées. `DEFAULT_STAT_CAP = 7` ; corps Smasher à 10 et statistiques de tir interdites remboursées. Les règles détaillées et limites sont dans `packages/sim/README.md`.
-- `resolveModeConfig(mode, options)` renvoie une copie indépendante du preset.
+- `resolveModeConfig(mode, options)` renvoie une copie indépendante du preset. Pour Teams/Maze, le serveur choisit la graine puis appelle l’export additionnel `prepareModeConfig(config, seed)` de `@diep-fried/sim`, qui importe les générateurs locaux de cartes. Ce résultat est passé à `Room` et à `Simulation`, puis envoyé tel quel dans `room.joined.config`. La simulation ne régénère jamais une carte cachée ; les appelants hors serveur doivent résoudre la carte avant de la construire.
 
 ### 4.5 Serveur (variables d'environnement)
 
@@ -153,18 +154,18 @@ type SimulationFactory = (options: { config: ModeConfig; seed: number }) => Simu
 
 `GET /healthz` → `{ status: "ok", protocol, version, uptimeSeconds, rooms, players }`.
 
-## 5. Familles implémentées et modes prévus
+## 5. Familles et modes implémentés
 
-Les familles de classes sont implémentées dans la simulation ; les modes listés plus bas restent des extensions :
+Les familles de classes et les modes sans objectifs sont implémentés dans la simulation :
 
 - **Drones** : `ProjectileState.family = 'drone'` avec `health`, `ClassDefinition.droneLimit`, guidage avec `fire` vers `PlayerInput.aim` (point visé) et `alt` (repousser), défense autonome au repos et portée bornée. Necromancer : conversion de carrés par contact du tank ou de ses drones, capacité `14 + 4 × Reload` (42 au plafond).
 - **Pièges** : `family = 'trap'`, frottement fort et longue durée de vie, définis par canon (`projectile: 'trap'`).
 - **Missiles et minions** : `family = 'missile' | 'minion'` ; portent les champs optionnels `barrelShots`, `classId`, `bodyShape`. Factory produit des minions armés ; les missiles tirent des balles secondaires ou explosent en éclats.
 - **Tourelles automatiques, Smasher, invisibilité** : pilotés par les paramètres de classe/canon ci-dessus ; `TankState.opacity` porte le fondu. Les tourelles choisissent la cible hostile visible la plus proche. Le rendu des géométries avancées reste un lot client distinct.
-- **Équipes (2/4 Teams)** : `ModeConfig.teams` + `map.zones` (`base`, `spawn`), `ModeRules.assignTeam` équilibre, `canDamage` protège les alliés.
-- **Maze** : `map.walls` (rectangles), envoyés une fois dans `room.joined` ; collisions dans la simulation, dessin côté client.
+- **Équipes (2/4 Teams)** : camps équilibrés au join, conservés au respawn ; bases latérales (2) ou aux coins (4). Les presets interdisent les dégâts alliés. Une barrière autoritaire balayée exclut tanks/tirs ennemis et formes des bases. Un tank entièrement dans sa base reste protégé même en tirant (`spawnProtected`). Quatre gardes indestructibles/base chassent les hostiles dans une bande de 220 unités, sans XP humain ; rendu `ProjectileState.family = drone`, `ownerId = id` du garde, aucun nouveau contrat d’entité.
+- **Maze** : `map.walls` définitifs envoyés dans `room.joined` ; balayage continu tanks/formes/tirs/drones/minions/pièges, bouches de canon incluses. Les impacts de tirs avant un mur sont résolus puis le mur détruit le projectile ; Firework explose au contact. LoS requise pour le ciblage IA. Pas de pathfinding ni d’occlusion réseau des snapshots.
 - **Modes à objectifs (Domination, Tag, CTF…)** : nouveau `ModeId` + preset, crochet de fin de tick dans `ModeRules`, état d'objectif ajouté au snapshot par un champ optionnel.
-- **Sandbox** : `sandbox.cheats` autorisera des commandes supplémentaires (niveau, classe libre) ajoutées à `PlayerCommand`.
+- **Sandbox** : `sandbox.cheats` autorise `levelUp` (+1, plafond 45 et `maxLevel`), `cycleClass` (54 classes, niveau/score conservés, stats incompatibles remboursées, drones/caméra nettoyés), `selfDestruct` (mort sans XP de kill), `toggleGod` (immunité visible via `spawnProtected`, effacée à la mort/au respawn). Les actions ne donnent aucun pouvoir dans les presets FFA/Teams/Maze ; aucun objectif ni boss dans ce lot. Règles détaillées dans `packages/sim/README.md`.
 - **IA et boss** : `TankState.playerId = null` ; leur comportement vit dans la simulation.
 
 ## 6. Commandes

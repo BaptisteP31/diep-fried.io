@@ -28,6 +28,23 @@ const base: Omit<ModeConfig, 'mode'> = {
 
 const PRESETS: Record<ModeId, Omit<ModeConfig, 'mode'>> = {
   ffa: base,
+  maze: base,
+  teams2: {
+    ...base,
+    teams: [
+      { id: 1, color: 'blue', name: 'Bleus' },
+      { id: 2, color: 'red', name: 'Rouges' },
+    ],
+  },
+  teams4: {
+    ...base,
+    teams: [
+      { id: 1, color: 'blue', name: 'Bleus' },
+      { id: 2, color: 'red', name: 'Rouges' },
+      { id: 3, color: 'green', name: 'Verts' },
+      { id: 4, color: 'purple', name: 'Violets' },
+    ],
+  },
   sandbox: {
     ...base,
     maxPlayers: 8,
