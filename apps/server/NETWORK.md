@@ -24,3 +24,5 @@ Le contrôle Origin est une restriction nouvellement active : par défaut même 
 Les tests sockets couvrent reprise après coupure, remplacement vivant, séquences hautes/basses et doublons, jetons faux/vides/d'un autre salon, grâce et capacité, départ explicite, neutralisation au point d'injection, quotas et recharge, libération des upgrades refusés sans fermeture client, origine, heartbeat, taille/binaire, métriques, huit joueurs et arrêt coopérant/non coopérant. Le test de neutralisation observe l'interface de la vraie simulation provisoire ; ce placeholder ne permet pas de vérifier les conséquences physiques des boutons ou du mouvement.
 
 Les instructions d'exploitation, compteurs et la mesure avec ses limites figurent dans [self-hosting.md](../../docs/self-hosting.md). Le coordinateur devra refaire cette mesure et valider le comportement physique à la déconnexion avec `createSimulation` avant de déclarer l'acceptation de la partie complète.
+
+Sous pression de capacité, les salons sans joueur ni siège réservé en grâce sont récupérés avant de refuser une création. Les salons occupés ou reprenables sont conservés.

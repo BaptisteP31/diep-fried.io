@@ -45,6 +45,17 @@ export class RoomManager {
 
   /** Crée et démarre un salon, ou renvoie `null` si la limite de salons est atteinte. */
   create(mode: ModeId, options: RoomOptions): Room | null {
+    // Réclamer uniquement les salons sans joueur ni siège en grâce sous pression.
+    // Leur TTL normal reste utile pour partager/rejoindre un salon récemment vidé.
+    if (this.rooms.size >= this.options.maxRooms) {
+      for (const [code, room] of this.rooms) {
+        if (room.playerCount !== 0) continue;
+        room.stop();
+        this.retiredDroppedMs += room.totalDroppedMs;
+        this.rooms.delete(code);
+        if (this.rooms.size < this.options.maxRooms) break;
+      }
+    }
     if (this.rooms.size >= this.options.maxRooms) return null;
     const code = this.uniqueCode();
     const room = new Room(

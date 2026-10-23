@@ -225,14 +225,34 @@ describe('WebSocket', () => {
     expect(health).toMatchObject({ rooms: 1, players: 0 });
   });
 
-  it('refuse la création au-delà du nombre maximal de salons', async () => {
-    const ana = await TestClient.connect(await start({ maxRooms: 1 }));
+  it('refuse la création quand tous les salons ont des joueurs', async () => {
+    const host = await start({ maxRooms: 1 });
+    const ana = await TestClient.connect(host);
     ana.send({ t: 'room.create', name: 'Ana', mode: 'ffa', options: {} });
     await ana.next('room.joined');
-    ana.send({ t: 'room.leave' });
-    await ana.next('room.left');
+    const bob = await TestClient.connect(host);
+    bob.send({ t: 'room.create', name: 'Bob', mode: 'ffa', options: {} });
+    expect(await bob.next('error')).toMatchObject({ code: 'server_full' });
+  });
+
+  it('récupère un salon vide sous pression sans perdre les sièges en grâce', async () => {
+    const host = await start({ maxRooms: 1 });
+    const ana = await TestClient.connect(host);
+    for (let i = 0; i < 4; i++) {
+      ana.send({ t: 'room.create', name: 'Ana', mode: 'ffa', options: {} });
+      await ana.next('room.joined');
+      ana.send({ t: 'room.leave' });
+      await ana.next('room.left');
+    }
     ana.send({ t: 'room.create', name: 'Ana', mode: 'ffa', options: {} });
-    expect(await ana.next('error')).toMatchObject({ code: 'server_full' });
+    const joined = await ana.next('room.joined');
+    ana.socket.terminate();
+    await ana.closed;
+    const bob = await TestClient.connect(host);
+    bob.send({ t: 'room.create', name: 'Bob', mode: 'ffa', options: {} });
+    expect(await bob.next('error')).toMatchObject({ code: 'server_full' });
+    bob.send({ t: 'room.join', code: joined.code, name: 'Ana', resumeToken: joined.resumeToken });
+    expect((await bob.next('room.joined')).playerId).toBe(joined.playerId);
   });
 });
 
