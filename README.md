@@ -1,6 +1,6 @@
 # diep-fried.io
 
-Jeu de tanks multijoueur autonome et auto-hébergeable, inspiré du gameplay classique de Diep.io. Développement en cours : FFA/Sandbox, cinq premières classes et salons privés sont implémentés ; les classes avancées et les autres modes sont en construction.
+Jeu de tanks multijoueur autonome et auto-hébergeable, inspiré du gameplay classique de Diep.io. Développement en cours : 54 classes et 11 modes sont implémentés côté simulation. Les salons privés, commandes Sandbox, rendu procédural et arbre d’évolution sont intégrés. Le HUD des modes à objectifs et leur validation finale sont en cours.
 
 ## Démarrage
 

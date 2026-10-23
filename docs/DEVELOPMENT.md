@@ -29,7 +29,14 @@ npm run build && npm start   # version auto-hébergée sur :8080
 
 ## État
 
-Recherches, ressources libres et catalogue documentaire intégrés. Revue indépendante du catalogue intégrée ; 54 classes uniques et atteignables, avec évolutions réciproques et tiers croissants contrôlés par le coordinateur. Socle TypeScript, contrats partagés, serveur de salons et client Canvas intégrés avec simulation provisoire. Voir [architecture.md](architecture.md).
+- Socle et partie privée : intégrés, réseau revu, contrôles automatiques et smoke navigateur à deux profils.
+- 54 classes et familles avancées : intégrées ; audit indépendant suivi de correctifs Factory, camouflage et rendu.
+- Équipes, Maze et commandes Sandbox : intégrés et exposés dans le client.
+- Domination, Tag, CTF, Breakout, Survival, Mothership, boss et rounds : simulation intégrée ; HUD et revue indépendante en cours.
+- CI et scripts de smoke/charge : intégrés ; revalidation après chaque lot majeur.
+- Licence du code : AGPL-3.0-or-later. Archive source distribuée en préparation.
+
+Les tests ne démontrent pas une fidélité exacte au jeu original : coefficients et plusieurs règles restent des conventions du remake à calibrer en parties réelles.
 
 ## Arbitrage des jalons
 
