@@ -1,4 +1,4 @@
-import type { DeathInfo } from '@diep-fried/shared';
+import type { DeathInfo, SelfState } from '@diep-fried/shared';
 import { formatScore } from './hud';
 
 export interface DeathScreenCallbacks {
@@ -15,7 +15,9 @@ export class DeathScreen {
   private readonly statsText: HTMLElement;
   private readonly respawnBtn: HTMLButtonElement;
 
-  private deathInfo: DeathInfo | null = null;
+  private deathInfo: (Omit<DeathInfo, 'respawnTick'> & { respawnTick: number | null }) | null =
+    null;
+  private fromSnapshot = false;
   private currentTick = 0;
   private tickRate = 30;
 
@@ -30,6 +32,14 @@ export class DeathScreen {
     });
 
     window.addEventListener('keydown', (e) => {
+      if (e.defaultPrevented || e.repeat) return;
+      if (
+        e.target instanceof HTMLElement &&
+        e.target.closest(
+          'input, textarea, select, button, [role="dialog"], [contenteditable="true"]',
+        )
+      )
+        return;
       if (this.isVisible && (e.code === 'Enter' || e.code === 'Space')) {
         if (!this.respawnBtn.disabled) {
           e.preventDefault();
@@ -44,6 +54,7 @@ export class DeathScreen {
   }
 
   show(info: DeathInfo, tickRate = 30): void {
+    this.fromSnapshot = false;
     this.deathInfo = info;
     this.tickRate = tickRate;
     this.container.hidden = false;
@@ -51,7 +62,7 @@ export class DeathScreen {
     if (info.killerName) {
       this.killerText.textContent = `Éliminé par ${info.killerName}`;
     } else {
-      this.killerText.textContent = 'Votre tank a été détruit';
+      this.killerText.textContent = 'Responsable inconnu';
     }
 
     this.statsText.textContent = `Score final : ${formatScore(info.score)} — Niveau ${info.level}`;
@@ -61,6 +72,30 @@ export class DeathScreen {
   hide(): void {
     this.container.hidden = true;
     this.deathInfo = null;
+    this.currentTick = 0;
+    this.fromSnapshot = false;
+    this.respawnBtn.disabled = true;
+  }
+
+  /** Une reprise peut manquer death : self est suffisant pour afficher la réapparition. */
+  syncSelf(self: SelfState, tick: number, tickRate: number): void {
+    if (self.alive) {
+      this.hide();
+      return;
+    }
+    this.currentTick = tick;
+    if (!this.deathInfo) {
+      this.show(
+        { ...self, tick, killerName: null, respawnTick: self.respawnTick ?? tick },
+        tickRate,
+      );
+      this.fromSnapshot = true;
+    }
+    this.deathInfo!.respawnTick = self.respawnTick;
+    if (this.fromSnapshot) {
+      this.statsText.textContent = `État actuel : score ${formatScore(self.score)} — Niveau ${self.level}`;
+    }
+    this.updateRespawnCountdown();
   }
 
   setTick(currentTick: number): void {
@@ -73,6 +108,11 @@ export class DeathScreen {
   private updateRespawnCountdown(): void {
     if (!this.deathInfo) return;
     const respawnTick = this.deathInfo.respawnTick;
+    if (respawnTick === null) {
+      this.respawnBtn.disabled = true;
+      this.respawnBtn.textContent = 'En attente du serveur…';
+      return;
+    }
     if (this.currentTick < respawnTick) {
       const remainingTicks = Math.max(0, respawnTick - this.currentTick);
       const remainingSec = Math.ceil(remainingTicks / this.tickRate);

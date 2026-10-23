@@ -70,7 +70,7 @@ export class GameHud {
   private lastClassChoicesKey = '';
   private lastLeaderboard: LeaderboardEntry[] = [];
 
-  constructor(callbacks: HudCallbacks) {
+  constructor(private readonly callbacks: HudCallbacks) {
     this.container = document.getElementById('hud')!;
     this.roomCode = document.getElementById('hud-room')!;
     this.pingText = document.getElementById('hud-ping')!;
@@ -159,6 +159,16 @@ export class GameHud {
     this.classChoicesPanel.hidden = true;
     this.statsPanel.hidden = true;
     this.bottomHud.hidden = true;
+  }
+
+  reset(): void {
+    this.hide();
+    this.lastClassChoicesKey = '';
+    this.classChoicesList.innerHTML = '';
+    this.lastLeaderboard = [];
+    this.leaderboardList.innerHTML = '';
+    this.setPing(null);
+    this.setToggles(false, false);
   }
 
   setRoomCode(code: string): void {
@@ -259,8 +269,7 @@ export class GameHud {
       card.appendChild(canvas);
       card.appendChild(label);
       card.addEventListener('click', () => {
-        const evt = new CustomEvent('choose-class', { detail: classId, bubbles: true });
-        this.classChoicesPanel.dispatchEvent(evt);
+        this.callbacks.onChooseClass(classId);
       });
       this.classChoicesList.appendChild(card);
     }

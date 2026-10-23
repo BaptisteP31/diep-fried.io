@@ -1,19 +1,17 @@
 import {
   ACTION_DESCRIPTIONS,
-  DEFAULT_BINDINGS,
   formatKeyCode,
   loadBindings,
   resetBindings,
   saveBindings,
-  type HeldAction,
   type KeyAction,
   type KeyBindings,
-  type ToggleAction,
 } from '../input/bindings';
-import { STAT_IDS, type StatId } from '@diep-fried/shared';
+import { STAT_IDS } from '@diep-fried/shared';
 
 export interface ControlsModalCallbacks {
   onBindingsChanged(bindings: KeyBindings): void;
+  onVisibilityChanged?(visible: boolean): void;
 }
 
 /**
@@ -27,7 +25,7 @@ export class ControlsModal {
   private readonly resetBtn: HTMLElement;
   private bindings: KeyBindings;
   private listeningAction: KeyAction | null = null;
-  private listeningRow: HTMLElement | null = null;
+  private previousFocus: HTMLElement | null = null;
 
   constructor(private readonly callbacks: ControlsModalCallbacks) {
     this.modal = document.getElementById('controls-modal')!;
@@ -48,17 +46,21 @@ export class ControlsModal {
   }
 
   show(): void {
+    this.previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.bindings = loadBindings();
     this.listeningAction = null;
-    this.listeningRow = null;
     this.renderList();
     this.modal.hidden = false;
+    this.callbacks.onVisibilityChanged?.(true);
+    this.closeBtn.focus();
   }
 
   hide(): void {
     this.listeningAction = null;
-    this.listeningRow = null;
     this.modal.hidden = true;
+    this.callbacks.onVisibilityChanged?.(false);
+    this.previousFocus?.focus();
   }
 
   get isVisible(): boolean {
@@ -67,6 +69,18 @@ export class ControlsModal {
 
   private onWindowKeyDown(e: KeyboardEvent): void {
     if (!this.isVisible) return;
+
+    // La capture empêche aussi les raccourcis de réapparition de recevoir Entrée/Espace.
+    e.stopImmediatePropagation();
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const buttons = [...this.modal.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const next = (index + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length;
+      buttons[next]?.focus();
+      return;
+    }
 
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -158,13 +172,13 @@ export class ControlsModal {
 
       keyBtn.addEventListener('click', () => {
         this.listeningAction = item.action;
-        this.listeningRow = row;
         this.renderList();
       });
 
       row.appendChild(label);
       row.appendChild(keyBtn);
       this.list.appendChild(row);
+      if (isCurrentListening) keyBtn.focus();
     }
   }
 }

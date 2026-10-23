@@ -133,11 +133,29 @@ button:disabled {
   text-align: center;
 }
 
+#menu {
+  width: min(38rem, calc(100vw - 2rem));
+  min-width: 0;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
 #menu fieldset {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   border: 0;
   padding: 0;
+}
+
+#menu-code {
+  min-width: 0;
+  width: 8rem;
+  flex: 1;
+}
+
+#menu-join-new {
+  flex-basis: 100%;
 }
 
 #menu legend {

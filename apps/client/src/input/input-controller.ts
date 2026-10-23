@@ -1,11 +1,5 @@
 import type { PlayerInput, StatId, Vec2 } from '@diep-fried/shared';
-import {
-  DEFAULT_BINDINGS,
-  loadBindings,
-  moveIntent,
-  type HeldAction,
-  type KeyBindings,
-} from './bindings';
+import { loadBindings, moveIntent, type HeldAction, type KeyBindings } from './bindings';
 
 /** Vitesse de rotation de la visée automatique, en radians par seconde (choix d'ergonomie). */
 const AUTO_SPIN_SPEED = Math.PI / 2;
@@ -28,6 +22,7 @@ export class InputController {
   private autoSpin = false;
   private spinAngle = 0;
   private seq = 0;
+  private enabled = true;
   private bindings: KeyBindings;
   private readonly onStat: (stat: StatId) => void;
   private readonly onToggle:
@@ -50,7 +45,7 @@ export class InputController {
 
     window.addEventListener('keydown', (event) => this.onKey(event, true));
     window.addEventListener('keyup', (event) => this.onKey(event, false));
-    window.addEventListener('blur', () => this.held.clear());
+    window.addEventListener('blur', () => this.reset(false));
     target.addEventListener('mousemove', (event) => {
       this.mouse.x = event.clientX;
       this.mouse.y = event.clientY;
@@ -61,7 +56,30 @@ export class InputController {
   }
 
   setBindings(newBindings: KeyBindings): void {
+    this.reset(false);
     this.bindings = { ...newBindings };
+  }
+
+  setEnabled(enabled: boolean): void {
+    if (this.enabled === enabled) return;
+    this.enabled = enabled;
+    if (!enabled) this.reset(false);
+  }
+
+  reset(resetSequence = true): void {
+    this.held.clear();
+    this.mouse.primary = false;
+    this.mouse.secondary = false;
+    this.autoFire = false;
+    this.autoSpin = false;
+    this.spinAngle = 0;
+    if (resetSequence) this.seq = 0;
+    this.onToggle?.('autoFire', false);
+    this.onToggle?.('autoSpin', false);
+  }
+
+  acknowledgeSequence(seq: number): void {
+    this.seq = Math.max(this.seq, seq);
   }
 
   getBindings(): KeyBindings {
@@ -77,12 +95,14 @@ export class InputController {
   }
 
   toggleAutoFire(): boolean {
+    if (!this.enabled) return false;
     this.autoFire = !this.autoFire;
     this.onToggle?.('autoFire', this.autoFire);
     return this.autoFire;
   }
 
   toggleAutoSpin(): boolean {
+    if (!this.enabled) return false;
     this.autoSpin = !this.autoSpin;
     this.onToggle?.('autoSpin', this.autoSpin);
     return this.autoSpin;
@@ -106,22 +126,27 @@ export class InputController {
     }
     return {
       seq: ++this.seq,
-      move: moveIntent(this.held),
+      move: this.enabled ? moveIntent(this.held) : { x: 0, y: 0 },
       aim,
-      fire: this.autoFire || this.mouse.primary || this.held.has('fire'),
-      alt: this.mouse.secondary || this.held.has('alt'),
+      fire: this.enabled && (this.autoFire || this.mouse.primary || this.held.has('fire')),
+      alt: this.enabled && (this.mouse.secondary || this.held.has('alt')),
     };
   }
 
   private onKey(event: KeyboardEvent, down: boolean): void {
+    // Une touche relâchée reste relâchée même si le focus a changé entre-temps.
+    const action = this.bindings[event.code];
+    if (!down && action?.kind === 'held') this.held.delete(action.action);
+    if (!this.enabled || event.defaultPrevented) return;
     if (
       event.target instanceof HTMLInputElement ||
       event.target instanceof HTMLTextAreaElement ||
-      event.target instanceof HTMLSelectElement
+      event.target instanceof HTMLSelectElement ||
+      (event.target instanceof HTMLElement &&
+        (event.target.isContentEditable || event.target.closest('button, [role="dialog"]')))
     ) {
       return;
     }
-    const action = this.bindings[event.code];
     if (!action) return;
     event.preventDefault();
     if (action.kind === 'held') {
@@ -141,6 +166,7 @@ export class InputController {
   }
 
   private onButton(button: number, down: boolean): void {
+    if (down && !this.enabled) return;
     if (button === 0) this.mouse.primary = down;
     if (button === 2) this.mouse.secondary = down;
   }

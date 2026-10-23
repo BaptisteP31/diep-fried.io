@@ -92,6 +92,22 @@ describe('configuration et persistance des touches', () => {
     expect(mockStorage.getItem(BINDINGS_STORAGE_KEY)).toBeNull();
   });
 
+  it('ne restaure pas une ancienne touche après un rebind puis rechargement', () => {
+    const custom: KeyBindings = {
+      ...DEFAULT_BINDINGS,
+      KeyT: { kind: 'toggle', action: 'autoFire' },
+    };
+    delete custom.KeyE;
+    saveBindings(custom, mockStorage);
+    expect(loadBindings(mockStorage).KeyE).toBeUndefined();
+    expect(loadBindings(mockStorage).KeyT).toEqual({ kind: 'toggle', action: 'autoFire' });
+  });
+
+  it('ignore une configuration corrompue au lieu de faire planter les entrées', () => {
+    mockStorage.setItem(BINDINGS_STORAGE_KEY, JSON.stringify({ KeyW: null }));
+    expect(loadBindings(mockStorage)).toEqual(DEFAULT_BINDINGS);
+  });
+
   it('formate les codes de touches pour l’affichage en français', () => {
     expect(formatKeyCode('KeyW')).toBe('Z / W');
     expect(formatKeyCode('KeyA')).toBe('Q / A');
