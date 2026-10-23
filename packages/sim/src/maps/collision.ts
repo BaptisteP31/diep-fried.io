@@ -1,5 +1,5 @@
 import type { Rect } from '@diep-fried/shared';
-import type { Circle, CircleWallResolution, SweptCircleHit } from './types';
+import { MAZE_LIMITS, type Circle, type CircleWallResolution, type SweptCircleHit } from './types';
 
 /**
  * Teste si un cercle intersecte un rectangle de mur (AABB).
@@ -180,6 +180,16 @@ export function resolveCircleVsWalls(
   walls: readonly Rect[],
   iterations = 3,
 ): { x: number; y: number; collided: boolean } {
+  if (
+    !Number.isInteger(iterations) ||
+    iterations < 1 ||
+    iterations > MAZE_LIMITS.maxResolveIterations
+  ) {
+    throw new RangeError(
+      `iterations invalide: ${iterations}. Attendu: entier dans [1, ${MAZE_LIMITS.maxResolveIterations}].`,
+    );
+  }
+
   let currX = cx;
   let currY = cy;
   let anyCollision = false;
@@ -381,7 +391,9 @@ export function sweepCircleVsWalls(
     const wall = walls[i];
     if (!wall) continue;
     const hit = sweepCircleVsWall(startX, startY, endX, endY, radius, wall);
-    if (hit.hit && hit.time < earliestHit.time) {
+    // Le premier mur touché gagne, y compris un contact tangent exactement à l'arrivée
+    // (time === 1), pour rester cohérent avec sweepCircleVsWall.
+    if (hit.hit && (bestWallIndex === -1 || hit.time < earliestHit.time)) {
       earliestHit = hit;
       bestWallIndex = i;
       if (hit.time === 0) break; // Impossible de frapper plus tôt

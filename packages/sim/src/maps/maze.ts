@@ -1,7 +1,11 @@
 import type { Rect, Vec2 } from '@diep-fried/shared';
 import { BALANCE } from '../balance';
 import { Rng } from '../rng';
-import { verifyMazeConnectivity } from './floodfill';
+import {
+  countConnectivityCells,
+  defaultConnectivityStep,
+  verifyMazeConnectivity,
+} from './floodfill';
 import { MAZE_LIMITS, type MazeLayoutResult, type MazeOptions } from './types';
 
 /**
@@ -125,10 +129,119 @@ function validateMazeOptions(options: MazeOptions): {
 }
 
 /**
+ * Valide les zones réservées : tableau borné de rectangles finis de dimensions strictement positives.
+ */
+function validateReservedZones(zones: unknown): readonly Rect[] {
+  if (!Array.isArray(zones)) {
+    throw new TypeError(`reservedZones invalide: tableau de Rect attendu, reçu ${typeof zones}.`);
+  }
+  if (zones.length > MAZE_LIMITS.maxReservedZones) {
+    throw new RangeError(
+      `Trop de zones réservées: ${zones.length} > ${MAZE_LIMITS.maxReservedZones}.`,
+    );
+  }
+  for (let i = 0; i < zones.length; i++) {
+    const zone = zones[i] as Rect | undefined;
+    if (
+      !zone ||
+      !Number.isFinite(zone.x) ||
+      !Number.isFinite(zone.y) ||
+      !Number.isFinite(zone.width) ||
+      !Number.isFinite(zone.height) ||
+      zone.width <= 0 ||
+      zone.height <= 0
+    ) {
+      throw new RangeError(
+        `Zone réservée ${i} invalide: ${JSON.stringify(zone)}. Attendu: x, y finis et width, height finis > 0.`,
+      );
+    }
+  }
+  return zones as readonly Rect[];
+}
+
+/**
+ * Retire de `wall` la partie recouverte par `zone` (au plus 4 rectangles restants).
+ */
+function subtractRect(wall: Rect, zone: Rect): Rect[] {
+  if (!rectsIntersect(wall, zone)) return [wall];
+
+  const wallRight = wall.x + wall.width;
+  const wallBottom = wall.y + wall.height;
+  const zoneRight = zone.x + zone.width;
+  const zoneBottom = zone.y + zone.height;
+  const pieces: Rect[] = [];
+
+  if (zone.x > wall.x) {
+    pieces.push({ x: wall.x, y: wall.y, width: zone.x - wall.x, height: wall.height });
+  }
+  if (zoneRight < wallRight) {
+    pieces.push({ x: zoneRight, y: wall.y, width: wallRight - zoneRight, height: wall.height });
+  }
+  const midX = Math.max(wall.x, zone.x);
+  const midRight = Math.min(wallRight, zoneRight);
+  if (zone.y > wall.y) {
+    pieces.push({ x: midX, y: wall.y, width: midRight - midX, height: zone.y - wall.y });
+  }
+  if (zoneBottom < wallBottom) {
+    pieces.push({
+      x: midX,
+      y: zoneBottom,
+      width: midRight - midX,
+      height: wallBottom - zoneBottom,
+    });
+  }
+  return pieces;
+}
+
+/**
  * Détermine si un rectangle intersecte une boîte AABB.
  */
 function rectsIntersect(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+function clipWalls(walls: readonly Rect[], zones: readonly Rect[]): Rect[] {
+  let current: Rect[] = [...walls];
+  for (const zone of zones) {
+    const next: Rect[] = [];
+    for (const wall of current) {
+      if (rectsIntersect(wall, zone)) {
+        for (const piece of subtractRect(wall, zone)) {
+          if (piece.width > 0 && piece.height > 0) next.push(piece);
+        }
+      } else {
+        next.push(wall);
+      }
+    }
+    current = next;
+  }
+  return current;
+}
+
+/**
+ * Choisit le pas d'échantillonnage de la vérification de connexité.
+ * Part du pas par défaut, le réduit si la bande libre du centre du tank dans un corridor
+ * est étroite, puis l'agrandit (jusqu'à la moitié de cette bande) si le budget de cellules
+ * est dépassé. Rejette (RangeError) si même ce pas maximal dépasse le budget.
+ */
+function chooseConnectivityStep(
+  width: number,
+  height: number,
+  tankRadius: number,
+  passageX: number,
+  passageY: number,
+): number {
+  const maxStep = (Math.min(passageX, passageY) - 2 * tankRadius) / 2;
+  let step = Math.min(defaultConnectivityStep(tankRadius), maxStep);
+  while (countConnectivityCells(width, height, tankRadius, step) > MAZE_LIMITS.maxFloodfillCells) {
+    step *= 1.5;
+    if (step > maxStep) {
+      throw new RangeError(
+        `Configuration trop coûteuse à vérifier: arène ${width}x${height}, rayon ${tankRadius}, bande libre ${(2 * maxStep).toFixed(1)} (> ${MAZE_LIMITS.maxFloodfillCells} cellules d'échantillonnage). Augmenter cellSize ou réduire l'arène.`,
+      );
+    }
+  }
+  return step;
 }
 
 /**
@@ -137,7 +250,8 @@ function rectsIntersect(a: Rect, b: Rect): boolean {
  */
 export function generateMazeLayout(options: MazeOptions): MazeLayoutResult {
   const { tankRadius, wallThickness, cellSize, loopFactor } = validateMazeOptions(options);
-  const { width, height, seed, reservedZones = [] } = options;
+  const { width, height, seed } = options;
+  const reservedZones = validateReservedZones(options.reservedZones ?? []);
 
   // Calcul du nombre de cellules de la grille
   const rawCols = Math.round(width / cellSize);
@@ -159,12 +273,16 @@ export function generateMazeLayout(options: MazeOptions): MazeLayoutResult {
     );
   }
 
+  // Pas d'échantillonnage de la vérification : au plus la moitié de la bande libre du centre
+  // du tank dans un corridor, pour qu'un couloir minimal contienne toujours des échantillons.
+  const sampleStep = chooseConnectivityStep(width, height, tankRadius, minPassageX, minPassageY);
+
   const totalCells = cols * rows;
   const dsu = new DisjointSet(totalCells);
   const rng = new Rng(seed);
 
   // Repérage des cellules réservées (ex: bases d'équipes)
-  const cellInReserved = new Int8Array(totalCells);
+  const cellInReserved = new Int16Array(totalCells);
   cellInReserved.fill(-1);
 
   for (let r = 0; r < rows; r++) {
@@ -383,6 +501,10 @@ export function generateMazeLayout(options: MazeOptions): MazeLayoutResult {
     }
   }
 
+  // Aucun mur ne doit recouvrir une zone réservée, y compris la demi-épaisseur qui déborde
+  // d'une frontière de cellule dans la zone ou entre deux zones adjacentes.
+  const finalWalls = reservedZones.length === 0 ? walls : clipWalls(walls, reservedZones);
+
   // Points de contrôle pour le test de connexité : centres de toutes les cellules
   const checkPoints: Vec2[] = [];
   for (let r = 0; r < rows; r++) {
@@ -398,8 +520,9 @@ export function generateMazeLayout(options: MazeOptions): MazeLayoutResult {
   const verification = verifyMazeConnectivity({
     width,
     height,
-    walls,
+    walls: finalWalls,
     tankRadius,
+    sampleStep,
     checkPoints,
   });
 
@@ -410,7 +533,7 @@ export function generateMazeLayout(options: MazeOptions): MazeLayoutResult {
   }
 
   return {
-    walls,
+    walls: finalWalls,
     grid: {
       cols,
       rows,
