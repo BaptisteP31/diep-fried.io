@@ -10,6 +10,7 @@ import {
   type TeamId,
 } from '@diep-fried/shared';
 import { makeCamera, worldToScreen, type Camera } from './camera';
+import { drawWorldMap } from './world-map';
 import { FadeTracker } from './fade-tracker';
 import { PALETTE, SHAPE_COLORS, SHINY_COLOR, TEAM_COLORS } from './palette';
 import { calculateBarrelRecoil, calculateRecoilOffset } from './recoil';
@@ -94,6 +95,7 @@ export class Renderer {
 
     if (config) this.drawOutsideArena(camera, config);
     this.drawGrid(camera);
+    if (config) drawWorldMap(ctx, camera, config);
     if (!frame) {
       this.fadeTracker.clear();
       return;
@@ -109,6 +111,14 @@ export class Renderer {
     // 1. Dessine les entités en cours de disparition (fondu)
     const fading = this.fadeTracker.getFading(nowMs);
     for (const { entity, alpha } of fading) {
+      // Une disparition réseau peut être due au camouflage : pas de fantôme adverse.
+      if (
+        entity.kind === 'tank' &&
+        entity.id !== ownEntityId &&
+        entity.team !== ownTeam &&
+        getClassDefinition(entity.classId)?.stealth
+      )
+        continue;
       ctx.save();
       const at = worldToScreen(camera, entity);
       ctx.translate(at.x, at.y);

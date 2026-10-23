@@ -4,6 +4,12 @@ Audit du 23 octobre 2026, base `c8d4e41c42228f63691861c5be024f4130daaab7`.
 Cette base contient classes `2a29e1c`, équipes/Maze/Sandbox `c6f20d2` et corrections de maps `a33caad` (intégration `c8d4e41`).
 Lecture seule du runtime : aucun changement de `world.ts`, des modèles, du client ou des coefficients. Les tests d'audit sont temporaires et non suivis ; seul ce rapport est destiné au commit.
 
+## Suivi d'intégration
+
+- Findings 3 et 4 : corrigés par le lot rendu `bd986eb`, postérieur à la base auditée (caméra Predator et angles des tourelles consommés par le renderer).
+- Finding 2 : le coordinateur ajoute le dessin de la carte résolue (murs et frontières de base), avec test dédié ; minimap inchangée.
+- Findings 1 et 5 : corrections simulation déléguées avec régressions demandées ; pas encore intégrées. Le client évite déjà les fantômes de disparition des classes furtives ennemies.
+
 ## Baseline et méthode
 
 - Consignes `/home/baptiste/.codex/RTK.md` appliquées : commandes shell via `rtk`.
