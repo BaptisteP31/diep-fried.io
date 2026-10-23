@@ -53,6 +53,8 @@ interface Bullet extends ProjectileState, Motion {
 interface Shape extends ShapeState, Motion {
   reward: number;
   spin: number;
+  /** Vitesse de dérive propre ; l'excédent reçu d'une poussée s'amortit. */
+  drift: number;
 }
 type Body = Tank | Bullet | Shape;
 interface Player {
@@ -318,8 +320,18 @@ class World implements Simulation {
     this.applyCommands();
     const dt = 1 / this.config.tickRate;
     for (const player of this.players.values()) this.prepareTank(player, dt);
+    const decay = Math.exp(-B.friction * dt);
     for (const body of this.bodies.values()) {
       if (body.kind === 'projectile' && body.expires <= this.tick) this.bodies.delete(body.id);
+      else if (body.kind === 'shape') {
+        // Sans frottement, une forme poussée garderait indéfiniment la vitesse d'un tank.
+        const speed = Math.hypot(body.vx, body.vy);
+        if (speed > body.drift) {
+          const scale = (body.drift + (speed - body.drift) * decay) / speed;
+          body.vx *= scale;
+          body.vy *= scale;
+        }
+      }
     }
     // Les corps lents sont sous-échantillonnés à <= 8 unités ; les balles sont balayées
     // sans limite de vitesse. La borne évite un coût non borné sur une config aberrante.
@@ -375,8 +387,9 @@ class World implements Simulation {
         if (!tank.triggering)
           tank.nextShots[index] = Math.max(tank.nextShots[index]!, now + barrel.delay * period);
         if (now + 1e-9 < tank.nextShots[index]!) return;
-        // Pas de rattrapage des tirs quand le bouton était relâché.
-        tank.nextShots[index] = now + period;
+        // Échéancier fractionnaire : la cadence moyenne suit la période exacte au lieu d'être
+        // arrondie au tick, au plus un tir par tick. Pas de rattrapage après relâchement.
+        tank.nextShots[index] = Math.max(tank.nextShots[index]! + period, now);
         tank.barrelShots[index] = this.tick;
         const angle = tank.angle + barrel.angle;
         const shotAngle = angle + this.rng.range(-barrel.spread, barrel.spread);
@@ -640,6 +653,7 @@ class World implements Simulation {
         maxHealth: health,
         reward: shape === 'square' ? 10 : shape === 'triangle' ? 25 : 130,
         spin: this.rng.range(-0.6, 0.6),
+        drift: speed,
         lastDamageTick: this.tick,
       };
       this.bodies.set(body.id, body);

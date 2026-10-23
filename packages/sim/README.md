@@ -1,7 +1,7 @@
 # Simulation FFA / Sandbox
 
 `createSimulation({ config, seed })` est le nouvel export de simulation autoritaire,
-conforme à `Simulation`. Le serveur doit choisir cette fabrique à l'intégration.
+conforme à `Simulation`, choisie par défaut par le serveur.
 `createPlaceholderSimulation` reste disponible et inchangée. Aucun contrat réseau,
 modèle partagé ni dépendance n'a changé. Les quatre évolutions du Tank sont maintenant
 présentes dans le registre de contenu partagé ; les branches de niveau 30+ restent vides.
@@ -23,7 +23,10 @@ présentes dans le registre de contenu partagé ; les branches de niveau 30+ res
   inversée pour les formes. Les balles quittant l'arène sont retirées. Les tirs
   partent de la bouche de chaque canon, avec ses multiplicateurs, son angle et son
   décalage latéral. `delay` s'applique au début d'une rafale ; les tirs ne sont pas
-  rattrapés après relâchement. Cadence arrondie au prochain tick disponible.
+  rattrapés après relâchement. Échéancier fractionnaire pendant une rafale : chaque tir
+  part au premier tick atteignant son échéance, la suivante est `échéance + période`,
+  donc la cadence moyenne est exacte et chaque point de Reload compte à 30 Hz. Au plus
+  un tir par canon et par tick.
 - Grille spatiale à cellules de 128 unités et boîtes balayées. Les contacts circulaires
   sont calculés en mouvement relatif et traités par temps d'impact, puis identifiants.
   Les corps sont intégrés en sous-pas d'au plus 8 unités de déplacement prévu
@@ -31,7 +34,8 @@ présentes dans le registre de contenu partagé ; les branches de niveau 30+ res
   fréquence ; une balle traverse au maximum chaque cible une fois. Les collisions de
   corps séparent les positions et annulent la vitesse relative entrante. Les formes
   se séparent sans se blesser. Les dégâts de contact mutuels sont prélevés avant les
-  récompenses, pour permettre deux morts simultanées.
+  récompenses, pour permettre deux morts simultanées. Une forme poussée revient à sa
+  vitesse de dérive initiale : l'excédent décroît avec le frottement des tanks (5/s).
 - Durabilité des balles indépendante de leurs dégâts : chaque impact consomme 8 PV
   contre une forme, `14 + 3 × bodyDamage` contre un tank, et les dégâts de la balle
   adverse contre une balle. Chaque cible reçoit un impact par balle, même si le
@@ -47,6 +51,11 @@ présentes dans le registre de contenu partagé ; les branches de niveau 30+ res
   automatique, pas de mise en attente d'une commande trop précoce. Au respawn :
   `floor(score × scoreKeptOnDeath)`, niveau recalculé, Tank, stats à zéro et points
   disponibles correspondant au niveau conservé. L'identifiant d'entité est neuf.
+  **Contrat runtime provisoire** : c'est la fraction de score `scoreKeptOnDeath` qui
+  fait foi, pas la convention documentaire « niveau `max(1, min(22, floor(L / 2)))` »
+  de `docs/specification/scope.md`. Avec FFA (0.5), un niveau 45 (23 540 XP) repart à
+  11 770 XP, soit niveau 32 au lieu de 22. Choix conservé jusqu'à calibration ; la
+  modification éventuelle passera par `shared`, pas par la simulation.
 - Choix de classe uniquement parmi les arêtes accessibles au niveau requis ; changer
   de branche ou revenir au Tank est refusé. Les points s'obtiennent aux niveaux 2–28,
   puis 30/33/36/39/42/45, soit 33. Un investissement coûte un point et respecte le
@@ -99,7 +108,7 @@ Le rejeu chargé couvre 8 joueurs et les 200 formes du preset FFA pendant 300 ti
 `test/spatial.test.ts` vérifie aussi des trajectoires de 2 000 unités par tick et
 les paires traversant plusieurs cellules.
 
-Ce lot ne branche pas le serveur sur la nouvelle fabrique. Pas de drones, pièges,
+Le serveur utilise désormais cette fabrique par défaut. Pas de drones, pièges,
 équipes, murs Maze, nid/alpha/crashers, triche réseau Sandbox ou classes de niveau 30+.
 Les formes utilisent des collisions circulaires, une dérive initiale et une rotation,
 sans IA ni régénération. L'apparition cherche une zone dégagée pendant 32 essais,
