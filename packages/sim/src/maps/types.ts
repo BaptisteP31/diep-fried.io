@@ -27,6 +27,21 @@ export const MAZE_LIMITS = {
   defaultBaseSizeRatio: 0.15,
   /** Marge intérieure par défaut pour les zones de spawn par rapport au pourtour de la base. */
   defaultSpawnMargin: 40,
+  /**
+   * Budget de cellules d'échantillonnage du floodfill (2^22 ≈ 4,2 M : Uint8 x2 + Int32 ≈ 25 Mo).
+   * Une arène de 50 000 avec un tank de rayon 25 (pas 25) tient pile dans ce budget.
+   */
+  maxFloodfillCells: 4_194_304,
+  /** Nombre maximal de murs acceptés par la vérification de connexité. */
+  maxFloodfillWalls: 200_000,
+  /** Nombre maximal de points de contrôle acceptés par la vérification de connexité. */
+  maxFloodfillCheckPoints: 250_000,
+  /** Budget d'entrées de l'index spatial des murs (somme des seaux touchés par chaque mur). */
+  maxFloodfillIndexEntries: 8_000_000,
+  /** Nombre maximal de zones réservées (les indices de zone tiennent dans un Int16Array). */
+  maxReservedZones: 256,
+  /** Nombre maximal d'itérations de résolution multi-murs (évite les boucles non bornées). */
+  maxResolveIterations: 64,
 } as const;
 
 /**

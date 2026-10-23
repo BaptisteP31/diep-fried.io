@@ -95,6 +95,13 @@ export function generateTeamLayoutResult(
       );
     }
 
+    // Les bases occupent toute la hauteur : la marge est aussi retranchée en haut et en bas.
+    if (height <= 2 * margin) {
+      throw new Error(
+        `Hauteur d'arène insuffisante (${height}) pour la marge de spawn (${margin}).`,
+      );
+    }
+
     // Team 1 (Bleu) - Flanc Ouest
     const base1: Rect = { x: 0, y: 0, width: baseWidth, height };
     const spawn1: Rect = {
