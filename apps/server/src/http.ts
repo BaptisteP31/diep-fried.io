@@ -3,6 +3,7 @@ import { stat } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { HEALTH_PATH, PROTOCOL_VERSION } from '@diep-fried/shared';
+import type { NetworkMetrics } from './transport/metrics';
 
 export interface HealthStatus {
   status: 'ok';
@@ -11,6 +12,8 @@ export interface HealthStatus {
   uptimeSeconds: number;
   rooms: number;
   players: number;
+  droppedSimulationMs: number;
+  network: NetworkMetrics;
 }
 
 const CONTENT_TYPES: Record<string, string> = {
