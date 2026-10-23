@@ -1,6 +1,6 @@
 import { CLASS_ID_PATTERN } from '../model/ids';
 import { isModeId, type RoomOptions } from '../model/mode';
-import type { PlayerCommand, PlayerInput } from '../model/player';
+import { SANDBOX_ACTIONS, type PlayerCommand, type PlayerInput } from '../model/player';
 import { isStatId } from '../model/stats';
 import { LIMITS, isRoomCode, sanitizeName } from './limits';
 import type { ClientMessage, JoinRoomMessage, ServerMessage } from './messages';
@@ -112,13 +112,10 @@ function readCommand(value: unknown): PlayerCommand {
     case 'sandbox':
       return {
         type: 'sandbox',
-        action: readEnum(value.action, 'sandbox.action', [
-          'levelUp',
-          'cycleClass',
-          'selfDestruct',
-          'toggleGod',
-        ]),
+        action: readEnum(value.action, 'sandbox.action', SANDBOX_ACTIONS),
       };
+    case 'possess':
+      return { type: 'possess' };
     default:
       throw new ValidationError('commande inconnue');
   }

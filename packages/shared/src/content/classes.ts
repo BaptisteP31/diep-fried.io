@@ -1,6 +1,7 @@
 import type { ClassId } from '../model/ids';
 import type { ProjectileFamily } from '../model/entities';
 import type { StatLevels } from '../model/stats';
+import { SPECIAL_CLASS_DEFINITIONS } from './special';
 
 /**
  * Définitions de classes de tanks, partagées par la simulation (comportement) et le client
@@ -45,6 +46,8 @@ export interface BarrelDefinition {
   lifetime?: number;
   radius?: number;
   missile?: 'skimmer' | 'rocketeer' | 'glider' | 'firework';
+  /** Forme des corps produits (drones carrés du Summoner...) ; défaut selon la famille. */
+  bodyShape?: 'circle' | 'triangle' | 'square';
 }
 
 export interface ClassDefinition {
@@ -683,6 +686,11 @@ export const CLASS_DEFINITIONS: Readonly<Record<ClassId, ClassDefinition>> = {
   'auto-tank': define('auto-tank', radial(4, auto)),
 };
 
+/**
+ * Classe jouable, ou à défaut classe spéciale (Dominator, Mothership, boss) pour le rendu et
+ * la simulation des entités IA. Les spéciales ne sont jamais proposées comme amélioration.
+ */
 export function getClassDefinition(id: ClassId): ClassDefinition | undefined {
-  return Object.hasOwn(CLASS_DEFINITIONS, id) ? CLASS_DEFINITIONS[id] : undefined;
+  if (Object.hasOwn(CLASS_DEFINITIONS, id)) return CLASS_DEFINITIONS[id];
+  return Object.hasOwn(SPECIAL_CLASS_DEFINITIONS, id) ? SPECIAL_CLASS_DEFINITIONS[id] : undefined;
 }
