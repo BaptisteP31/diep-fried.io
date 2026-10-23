@@ -1,0 +1,461 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Diep.io Procedural Rendering Primitives & Visual Tokens",
+  "version": "1.0.0",
+  "collectedAt": "2026-10-23",
+  "source": {
+    "url": "https://diep.io/",
+    "cssFile": "https://diep.io/assets/index-60017d06.css",
+    "method": "T3 preview_evaluate on computedStyle / stylesheet tokens"
+  },
+  "renderingEngine": {
+    "target": "Canvas 2D Context (HTML5 Canvas)",
+    "colorSpace": "sRGB",
+    "lineJoin": "round",
+    "lineCap": "round",
+    "strokeAlignment": "center",
+    "textOutlineFormula": "strokeText or multi-pass text-shadow with 16 samples at radius 0.18em"
+  },
+  "visualTokens": {
+    "world": {
+      "backgroundColor": {
+        "css": "var(--theme-color-backgroundColor)",
+        "hex": "#cccccc",
+        "rgb": "rgb(204, 204, 204)",
+        "alpha": 1.0,
+        "status": "measured"
+      },
+      "gridColor": {
+        "css": "var(--theme-color-gridColor)",
+        "hex": "#000000",
+        "rgb": "rgb(0, 0, 0)",
+        "alpha": 0.1,
+        "opacityToken": "--theme-opacity-gridOpacity",
+        "status": "measured"
+      },
+      "worldBorderColor": {
+        "css": "var(--theme-color-worldBorderColor)",
+        "hex": "#000000",
+        "rgb": "rgb(0, 0, 0)",
+        "alpha": 0.1,
+        "opacityToken": "--theme-opacity-worldBorderOpacity",
+        "status": "measured"
+      },
+      "mazeWallColor": {
+        "css": "var(--theme-color-mazeWallColor)",
+        "hex": "#bbbbbb",
+        "rgb": "rgb(187, 187, 187)",
+        "alpha": 1.0,
+        "status": "measured"
+      },
+      "outlineBorderColor": {
+        "css": "var(--border-color)",
+        "rgba": "rgba(0, 0, 0, 0.25)",
+        "opacityToken": "--theme-opacity-outlineOpacity",
+        "status": "measured"
+      },
+      "oldOutlineColor": {
+        "css": "var(--theme-color-oldOutlineColor)",
+        "hex": "#555555",
+        "rgb": "rgb(85, 85, 85)",
+        "alpha": 1.0,
+        "status": "measured"
+      }
+    },
+    "teamsAndTanks": {
+      "blueTeam": {
+        "css": "var(--theme-color-blueTeamColor)",
+        "hex": "#00b2e1",
+        "rgb": "rgb(0, 178, 225)",
+        "status": "measured",
+        "description": "Équipe bleue et tank allié"
+      },
+      "redTeam": {
+        "css": "var(--theme-color-redTeamColor)",
+        "hex": "#f14e54",
+        "rgb": "rgb(241, 78, 84)",
+        "status": "measured",
+        "description": "Équipe rouge et ennemi FFA"
+      },
+      "purpleTeam": {
+        "css": "var(--theme-color-purpleTeamColor)",
+        "hex": "#bf7ff5",
+        "rgb": "rgb(191, 127, 245)",
+        "status": "measured",
+        "description": "Équipe violette"
+      },
+      "greenTeam": {
+        "css": "var(--theme-color-greenTeamColor)",
+        "hex": "#00e16e",
+        "rgb": "rgb(0, 225, 110)",
+        "status": "measured",
+        "description": "Équipe verte"
+      },
+      "cannon": {
+        "css": "var(--theme-color-cannonColor)",
+        "hex": "#999999",
+        "rgb": "rgb(153, 153, 153)",
+        "status": "measured",
+        "description": "Canons de tanks et tourelles"
+      },
+      "barrelBorder": {
+        "css": "var(--net-border)",
+        "hex": "#555555",
+        "rgb": "rgb(85, 85, 85)",
+        "status": "measured",
+        "description": "Contour des canons"
+      },
+      "fallenBoss": {
+        "css": "var(--theme-color-fallenBossColor)",
+        "hex": "#c0c0c0",
+        "rgb": "rgb(192, 192, 192)",
+        "status": "measured",
+        "description": "Boss déchu (Fallen Overlord / Booster)"
+      },
+      "arenaCloser": {
+        "css": "var(--theme-color-arenaCloserColor)",
+        "hex": "#ffe869",
+        "rgb": "rgb(255, 232, 105)",
+        "status": "measured",
+        "description": "Arena Closer (jaune vif)"
+      },
+      "smasherBody": {
+        "css": "var(--theme-color-smasherColor)",
+        "hex": "#555555",
+        "rgb": "rgb(85, 85, 85)",
+        "status": "measured",
+        "description": "Corps blindé smasher"
+      }
+    },
+    "shapes": {
+      "square": {
+        "css": "var(--theme-color-squareColor)",
+        "hex": "#ffe869",
+        "rgb": "rgb(255, 232, 105)",
+        "edges": 4,
+        "status": "measured",
+        "description": "Carré jaune (nourriture de base)"
+      },
+      "triangle": {
+        "css": "var(--theme-color-triangleColor)",
+        "hex": "#fc7677",
+        "rgb": "rgb(252, 118, 119)",
+        "edges": 3,
+        "status": "measured",
+        "description": "Triangle rouge"
+      },
+      "pentagon": {
+        "css": "var(--theme-color-pentagonColor)",
+        "hex": "#768dfc",
+        "rgb": "rgb(118, 141, 252)",
+        "edges": 5,
+        "status": "measured",
+        "description": "Pentagone bleu standard"
+      },
+      "alphaPentagon": {
+        "css": "var(--theme-color-pentagonColor)",
+        "hex": "#768dfc",
+        "rgb": "rgb(118, 141, 252)",
+        "edges": 5,
+        "scaleFactor": 3.2,
+        "status": "measured",
+        "description": "Grand pentagone central",
+        "scaleFactorStatus": "estimated"
+      },
+      "crasher": {
+        "css": "var(--theme-color-crasherColor)",
+        "hex": "#f177dd",
+        "rgb": "rgb(241, 119, 221)",
+        "edges": 3,
+        "status": "measured",
+        "description": "Crasher rose agressif"
+      },
+      "shiny": {
+        "css": "var(--theme-color-shinyShapeColor)",
+        "hex": "#8aff69",
+        "rgb": "rgb(138, 255, 105)",
+        "edges": "variable",
+        "status": "measured",
+        "description": "Forme verte rare (shiny)"
+      },
+      "necroDrone": {
+        "css": "var(--theme-color-necroDroneColor)",
+        "hex": "#fcc376",
+        "rgb": "rgb(252, 195, 118)",
+        "edges": 4,
+        "status": "measured",
+        "description": "Carré contrôlé par le Necromancer"
+      }
+    },
+    "barsAndHud": {
+      "healthBarBackground": {
+        "css": "var(--theme-color-healthBarBackground)",
+        "hex": "#555555",
+        "rgb": "rgb(85, 85, 85)",
+        "status": "measured"
+      },
+      "healthBarFill": {
+        "css": "var(--theme-color-healthBarFill)",
+        "hex": "#85e37d",
+        "rgb": "rgb(133, 227, 125)",
+        "status": "measured"
+      },
+      "leaderboardBarFill": {
+        "css": "var(--theme-color-leaderboardBarFill)",
+        "hex": "#64ff8c",
+        "rgb": "rgb(100, 255, 140)",
+        "status": "measured"
+      },
+      "scoreBarFill": {
+        "css": "var(--theme-color-scoreBarFillColor)",
+        "hex": "#43ff91",
+        "rgb": "rgb(67, 255, 145)",
+        "status": "measured"
+      },
+      "xpBarFill": {
+        "css": "var(--theme-color-xpBarFillColor)",
+        "hex": "#ffde43",
+        "rgb": "rgb(255, 222, 67)",
+        "status": "measured"
+      },
+      "minimapBackground": {
+        "css": "var(--theme-color-minimapBackgroundColor)",
+        "hex": "#cdcdcd",
+        "rgb": "rgb(205, 205, 205)",
+        "status": "measured"
+      },
+      "minimapBorder": {
+        "css": "var(--theme-color-minimapBorderColor)",
+        "hex": "#797979",
+        "rgb": "rgb(121, 121, 121)",
+        "status": "measured"
+      },
+      "minimapArrow": {
+        "css": "var(--theme-color-minimapArrowColor)",
+        "hex": "#000000",
+        "rgb": "rgb(0, 0, 0)",
+        "status": "measured"
+      }
+    },
+    "typography": {
+      "primaryFont": "Ubuntu",
+      "primaryWeight": 700,
+      "strokeWidth": "0.18em",
+      "strokeColor": "#393939",
+      "fontFile": "assets/fonts/Ubuntu-Bold.ttf",
+      "license": "Ubuntu Font Licence v1.0",
+      "status": "verified-distributable"
+    }
+  },
+  "proceduralGeometryRules": {
+    "regularPolygon": {
+      "description": "Calcul trigonométrique des sommets d'une forme à N côtés réguliers centrée en (cx, cy) avec rayon R et angle d'orientation alpha.",
+      "vertexFormula": "x_i = cx + R * cos(alpha + i * 2 * PI / N), y_i = cy + R * sin(alpha + i * 2 * PI / N)",
+      "strokeRatio": "borderThickness = R * 0.08 ou fixe selon niveau de zoom",
+      "fillBeforeStroke": true
+    },
+    "tankBody": {
+      "description": "Cercle parfait tracé via arc()",
+      "path": "ctx.arc(cx, cy, radius, 0, 2 * Math.PI)",
+      "fill": "Couleur d'équipe ou de joueur",
+      "stroke": "Contour sombre 25% noir ou #555555"
+    },
+    "tankBarrel": {
+      "description": "Canon tracé comme rectangle ou trapèze avec décalage angulaire et animation de recul",
+      "drawingCoordinates": "Point d'ancrage au centre du tank (0,0), translate + rotate(barrelAngle)",
+      "recoilAnimation": "offset_x = length - recoilAmount * (1 - progress)",
+      "shapeTypes": [
+        {
+          "name": "straight",
+          "params": [
+            "length",
+            "width"
+          ]
+        },
+        {
+          "name": "trapezoid_expanding",
+          "params": [
+            "length",
+            "baseWidth",
+            "tipWidth"
+          ],
+          "description": "Machine Gun, Destroyer, Annihilator"
+        },
+        {
+          "name": "trapezoid_contracting",
+          "params": [
+            "length",
+            "baseWidth",
+            "tipWidth"
+          ],
+          "description": "Hunter, Predator"
+        }
+      ]
+    }
+  },
+  "starterClassesDefinitions": [
+    {
+      "id": "tank",
+      "tier": 0,
+      "name": "Tank",
+      "bodyRadius": 26,
+      "barrels": [
+        {
+          "length": 42,
+          "width": 18,
+          "angle": 0,
+          "offset": 0,
+          "type": "straight"
+        }
+      ]
+    },
+    {
+      "id": "twin",
+      "tier": 1,
+      "name": "Twin",
+      "bodyRadius": 26,
+      "barrels": [
+        {
+          "length": 42,
+          "width": 16,
+          "angle": 0,
+          "offset": 10,
+          "type": "straight"
+        },
+        {
+          "length": 42,
+          "width": 16,
+          "angle": 0,
+          "offset": -10,
+          "type": "straight"
+        }
+      ]
+    },
+    {
+      "id": "sniper",
+      "tier": 1,
+      "name": "Sniper",
+      "bodyRadius": 26,
+      "barrels": [
+        {
+          "length": 56,
+          "width": 18,
+          "angle": 0,
+          "offset": 0,
+          "type": "straight"
+        }
+      ]
+    },
+    {
+      "id": "machine_gun",
+      "tier": 1,
+      "name": "Machine Gun",
+      "bodyRadius": 26,
+      "barrels": [
+        {
+          "length": 42,
+          "baseWidth": 18,
+          "tipWidth": 26,
+          "angle": 0,
+          "offset": 0,
+          "type": "trapezoid_expanding"
+        }
+      ]
+    },
+    {
+      "id": "flank_guard",
+      "tier": 1,
+      "name": "Flank Guard",
+      "bodyRadius": 26,
+      "barrels": [
+        {
+          "length": 42,
+          "width": 18,
+          "angle": 0,
+          "offset": 0,
+          "type": "straight"
+        },
+        {
+          "length": 34,
+          "width": 18,
+          "angle": 180,
+          "offset": 0,
+          "type": "straight"
+        }
+      ]
+    }
+  ],
+  "renderLayersZOrder": [
+    {
+      "z": 0,
+      "layer": "background_color",
+      "description": "Remplissage uniforme de l'arène (#cccccc)"
+    },
+    {
+      "z": 10,
+      "layer": "grid_lines",
+      "description": "Grille de coordonnées (lignes noires avec opacité 0.1)"
+    },
+    {
+      "z": 20,
+      "layer": "team_bases",
+      "description": "Fonds colorés des zones de spawn d'équipe (opacité 0.1)"
+    },
+    {
+      "z": 30,
+      "layer": "arena_borders",
+      "description": "Bordures extérieures du monde (#000000, opacité 0.1)"
+    },
+    {
+      "z": 40,
+      "layer": "maze_walls",
+      "description": "Murs du mode Maze (#bbbbbb avec contours)"
+    },
+    {
+      "z": 50,
+      "layer": "food_shapes",
+      "description": "Formes neutres (carrés, triangles, pentagones, crashers)"
+    },
+    {
+      "z": 60,
+      "layer": "traps_and_drones",
+      "description": "Pièges au sol et drones sous contrôle"
+    },
+    {
+      "z": 70,
+      "layer": "bullets_and_projectiles",
+      "description": "Balles tirées par les tanks"
+    },
+    {
+      "z": 80,
+      "layer": "tank_barrels",
+      "description": "Canons orientés des tanks (dessinés sous le corps)"
+    },
+    {
+      "z": 90,
+      "layer": "tank_bodies",
+      "description": "Corps circulaires des tanks et tourelles supérieures"
+    },
+    {
+      "z": 100,
+      "layer": "health_bars",
+      "description": "Barres de vie au-dessus des tanks et formes endommagées"
+    },
+    {
+      "z": 110,
+      "layer": "entity_labels",
+      "description": "Noms de joueurs et scores avec contour Ubuntu Bold"
+    },
+    {
+      "z": 200,
+      "layer": "hud_overlay",
+      "description": "Barre d'XP, minimap, leaderboard, boutons de montée de niveau"
+    }
+  ],
+  "verificationNotes": {
+    "cssTokens": "Independently verified; see verified-css-tokens.json",
+    "geometry": "Prototype assumptions, not measured original geometry",
+    "layers": "Proposed ordering, not verified engine internals",
+    "renderingEngine": "Reported by delegated researcher; not independently audited"
+  }
+}

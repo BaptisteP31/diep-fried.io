@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "generatedAt": "2026-10-23T16:57:30Z",
+  "project": "diep-fried.io",
+  "domain": "rendering-assets",
+  "subagent": "research-rendering-assets",
+  "summary": {
+    "totalFilesCollectedOrProduced": 6,
+    "distributableAssetsCount": 3,
+    "distributableDocumentationCount": 3,
+    "proprietaryAssetsCollectedForDistribution": 0
+  },
+  "files": [
+    {
+      "id": "font-ubuntu-bold",
+      "path": "assets/fonts/Ubuntu-Bold.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ufl/ubuntu/Ubuntu-Bold.ttf",
+      "date": "2026-10-23",
+      "type": "font/ttf",
+      "sizeBytes": 331612,
+      "sha256": "679b5c1e09cab3156bb8ef529735f9382bf31ca7ac737382ab959297f8d82ad4",
+      "license": "Ubuntu Font Licence v1.0 (UFL-1.0)",
+      "provenance": "Dalton Maag / Canonical Ltd. via Google Fonts upstream repository",
+      "distributionStatus": "distributable",
+      "notes": "Police primaire pour le HUD, les pseudos, scores, statistiques et classements du jeu."
+    },
+    {
+      "id": "font-ubuntu-regular",
+      "path": "assets/fonts/Ubuntu-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ufl/ubuntu/Ubuntu-Regular.ttf",
+      "date": "2026-10-23",
+      "type": "font/ttf",
+      "sizeBytes": 351884,
+      "sha256": "3128df86a31805618436d0ae5651ba4285d0c9de0a39057d025f64ee33bceb64",
+      "license": "Ubuntu Font Licence v1.0 (UFL-1.0)",
+      "provenance": "Dalton Maag / Canonical Ltd. via Google Fonts upstream repository",
+      "distributionStatus": "distributable",
+      "notes": "Police secondaire pour les textes d'aide, paramètres et descriptions."
+    },
+    {
+      "id": "font-license-ufl",
+      "path": "assets/fonts/UFL.txt",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ufl/ubuntu/UFL.txt",
+      "date": "2026-10-23",
+      "type": "text/plain",
+      "sizeBytes": 4673,
+      "sha256": "2f0015108d68627bd788d313f529c21ff4da2c2c42a5e1f3883acc83480f9002",
+      "license": "Ubuntu Font Licence v1.0",
+      "provenance": "Canonical Ltd.",
+      "distributionStatus": "distributable",
+      "notes": "Texte intégral de la licence UFL-1.0 accompagnant les fichiers de polices."
+    },
+    {
+      "id": "font-readme",
+      "path": "assets/fonts/README.md",
+      "url": "local-file://assets/fonts/README.md",
+      "date": "2026-10-23",
+      "type": "text/markdown",
+      "sizeBytes": 2649,
+      "sha256": "1b8233a7263e364209f4238ed64563ba4d28cef846d05917e96598811d4facb8",
+      "license": "MIT",
+      "provenance": "Équipe diep-fried.io",
+      "distributionStatus": "distributable",
+      "notes": "Documentation des polices, règles de redistribution et snippets d'intégration CSS."
+    },
+    {
+      "id": "procedural-primitives-dataset",
+      "path": "docs/research/rendering-assets/procedural-primitives.json",
+      "url": "local-file://docs/research/rendering-assets/procedural-primitives.json",
+      "date": "2026-10-23",
+      "type": "application/json",
+      "sizeBytes": 13022,
+      "sha256": "36fc804bd23dc21c425dac551195584ba8a0196bad8d656808423f54fc8908b2",
+      "license": "MIT",
+      "provenance": "Extrait des tokens CSS officiels de diep.io et modélisation géométrique",
+      "distributionStatus": "distributable",
+      "notes": "Dataset machine-readable des couleurs CSS mesurées, couches Z-order et géométries des classes."
+    },
+    {
+      "id": "rendering-specification-doc",
+      "path": "docs/research/rendering-assets/rendering-specification.md",
+      "url": "local-file://docs/research/rendering-assets/rendering-specification.md",
+      "date": "2026-10-23",
+      "type": "text/markdown",
+      "sizeBytes": 15937,
+      "sha256": "95edf7e9fdda0cb096ba29b81094a3b70b0b068fea62f83f3f855dfd71661995",
+      "license": "CC-BY-4.0",
+      "provenance": "Recherche technique et rétro-ingénierie visuelle de diep.io",
+      "distributionStatus": "distributable",
+      "notes": "Spécification technique complète du pipeline Canvas 2D, typographie, audio et audit juridique."
+    }
+  ],
+  "excludedOrObservedResources": [
+    {
+      "id": "proprietary-store-skins",
+      "url": "https://api.diep.io/store/skins/art",
+      "date": "2026-10-23",
+      "type": "application/json (SVG embeds)",
+      "license": "Propriétaire Diep.io (Non libre)",
+      "distributionStatus": "excluded",
+      "reason": "Motifs vectoriels sous droits d'auteur exclusifs sans licence de redistribution. Ne doivent pas être distribués."
+    },
+    {
+      "id": "gameplay-sprites",
+      "url": "N/A",
+      "date": "2026-10-23",
+      "type": "N/A",
+      "license": "N/A",
+      "distributionStatus": "not_applicable",
+      "reason": "Aucune planche de sprites de gameplay identifiée dans les ressources observées ; primitives proposées pour le remake."
+    },
+    {
+      "id": "audio-assets",
+      "url": "N/A",
+      "date": "2026-10-23",
+      "type": "N/A",
+      "license": "N/A",
+      "distributionStatus": "not_applicable",
+      "reason": "Aucun audio identifié pendant la collecte ; absence globale non établie."
+    }
+  ]
+}

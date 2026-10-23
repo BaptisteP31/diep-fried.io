@@ -1,0 +1,70 @@
+{
+  "observedAt": "2026-10-23",
+  "source": "https://diep.io/",
+  "scope": "Resources loaded on the landing page, not an exhaustive site crawl",
+  "resources": [
+    "https://diep.io/assets/index-4248191f.js",
+    "https://diep.io/assets/index-60017d06.css",
+    "https://diep.io/diep.wasm",
+    "https://directory.diep.io/lobbies",
+    "https://diep.io/assets/fa/crown.svg",
+    "https://diep.io/assets/fa/store.svg",
+    "https://diep.io/assets/fa/gear.svg",
+    "https://diep.io/title.png",
+    "https://diep.io/assets/fa/xmark.svg",
+    "https://diep.io/assets/fa/gavel.svg",
+    "https://diep.io/assets/fa/circle-question.svg",
+    "https://diep.io/assets/fa/keyboard.svg",
+    "https://diep.io/assets/fa/users.svg",
+    "https://diep.io/assets/fa/game-board-simple.svg",
+    "https://diep.io/assets/fa/list-tree.svg",
+    "https://diep.io/assets/diep/logo.png",
+    "https://diep.io/assets/flag-square/gb.svg",
+    "https://diep.io/assets/fa/arrow-up-right-from-square.svg",
+    "https://diep.io/assets/flag-square/de.svg",
+    "https://diep.io/assets/fa/lock.svg",
+    "https://diep.io/assets/fa/chevron-up.svg",
+    "https://diep.io/assets/DiepDiscord.png",
+    "https://diep.io/assets/fa/circle-up-regular.svg",
+    "https://diep.io/assets/fa/film.svg",
+    "https://diep.io/assets/fa/camera-movie.svg",
+    "https://diep.io/assets/diep/new-blinker.png",
+    "https://diep.io/assets/fa/chevron-left.svg",
+    "https://lb.diep.io/api/getLatestChangelogAndDowntime",
+    "https://diep.io/assets/fa/right-to-bracket.svg",
+    "https://api.diep.io/store/skins/art",
+    "https://api.diep.io/store/offers",
+    "https://directory.diep.io/best-region",
+    "https://diep.io/assets/flag-square/us.svg",
+    "https://api.diep.io/store/rotations",
+    "https://diep.io/assets/fa/palette.svg",
+    "https://diep.io/assets/fa/clock.svg",
+    "https://diep.io/assets/fa/shirt.svg",
+    "https://api.diep.io/currency-bundles",
+    "https://diep.io/assets/fa/link-simple.svg",
+    "https://directory.diep.io/join",
+    "https://diep.io/assets/fa/chevron-down.svg"
+  ],
+  "canvases": [
+    {
+      "height": 1200,
+      "width": 1920
+    },
+    {
+      "height": 293,
+      "width": 392
+    },
+    {
+      "height": 293,
+      "width": 392
+    },
+    {
+      "height": 293,
+      "width": 392
+    }
+  ],
+  "loadedFontFamilies": [
+    "Ubuntu",
+    "Open Sans"
+  ]
+}
