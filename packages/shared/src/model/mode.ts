@@ -1,10 +1,24 @@
 import type { Rect } from './geometry';
-import type { TeamId } from './ids';
+import type { ClassId, TeamId } from './ids';
+import type { ObjectiveSite } from './match';
 
 /**
- * Modes implémentés. Les modes à objectifs restent des extensions futures.
+ * Modes implémentés. Les modes à objectifs sont des ajouts additifs du protocole v1 ;
+ * leurs règles sont des conventions de diep-fried.io.
  */
-export const MODE_IDS = ['ffa', 'sandbox', 'teams2', 'teams4', 'maze'] as const;
+export const MODE_IDS = [
+  'ffa',
+  'sandbox',
+  'teams2',
+  'teams4',
+  'maze',
+  'domination',
+  'tag',
+  'ctf',
+  'breakout',
+  'survival',
+  'mothership',
+] as const;
 
 export type ModeId = (typeof MODE_IDS)[number];
 
@@ -48,10 +62,16 @@ export interface ModeConfig {
     /** Murs infranchissables (Maze). */
     walls: Rect[];
     zones: MapZone[];
+    /** Objectifs des modes à objectifs, résolus avec la carte ; absent ailleurs. */
+    objectives?: ObjectiveSite[];
   };
   shapes: {
     /** Population visée de formes neutres. */
     targetCount: number;
+    /** Nid central : Alpha Pentagons et Crashers, en plus de `targetCount`. */
+    nest?: NestConfig;
+    /** Probabilité qu'une forme ordinaire apparaisse en variante rare (`shiny`). */
+    shinyChance?: number;
   };
   progression: {
     maxLevel: number;
@@ -68,6 +88,49 @@ export interface ModeConfig {
     /** Autorise les commandes de triche Sandbox (montée de niveau, changement de classe libre). */
     cheats: boolean;
   };
+  /** Rounds des modes à objectifs ; absent pour FFA/Sandbox/Teams/Maze. */
+  match?: MatchConfig;
+  /** Apparition périodique des boss classiques ; absent = aucun boss automatique. */
+  bosses?: BossConfig;
+}
+
+export interface NestConfig {
+  /** Rayon du nid centré sur l'arène. */
+  radius: number;
+  /** Alpha Pentagons visés : `round(targetCount × alphaShare)`. */
+  alphaShare: number;
+  /** Crashers visés : `round(targetCount × crasherShare)`. */
+  crasherShare: number;
+}
+
+export interface MatchConfig {
+  /** Joueurs connectés requis pour démarrer un round ; évite une victoire solo immédiate. */
+  minPlayers: number;
+  /** Durée de la phase `finished` avant le round suivant. */
+  restartDelayTicks: number;
+  /** Durée maximale d'un round, 0 = illimitée. À échéance : meilleur score, sinon égalité. */
+  timeLimitTicks: number;
+  /** Score de victoire (captures CTF, points Breakout) ; 0 = pas de seuil. */
+  scoreLimit: number;
+  /** Survival : rétrécissement de la zone sûre. */
+  shrink?: {
+    delayTicks: number;
+    durationTicks: number;
+    /** Rayon final en fraction du plus petit côté de l'arène. */
+    finalRadiusFraction: number;
+    damagePerSecond: number;
+  };
+}
+
+export interface BossConfig {
+  enabled: boolean;
+  /** Tick d'apparition du premier boss après le début du salon. */
+  firstSpawnTicks: number;
+  intervalTicks: number;
+  /** Boss vivants simultanés (borne dure de la simulation : 8). */
+  maxAlive: number;
+  /** Classes tirées ; absent = les cinq boss classiques. */
+  pool?: ClassId[];
 }
 
 /**

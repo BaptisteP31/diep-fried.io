@@ -76,3 +76,58 @@ export function pointsForLevel(level: number): number {
     Math.max(0, Math.min(27, level - 1)) + Math.max(0, Math.floor((Math.min(45, level) - 27) / 3))
   );
 }
+
+/**
+ * Coefficients **expérimentaux** des modes à objectifs, de l'IA et du nid : conventions de
+ * diep-fried.io, sans valeur de référence publique. Unités : secondes et unités monde.
+ */
+export const OBJECTIVE_BALANCE = {
+  /** Distance bord à bord maximale pour `possess`. */
+  possessRange: 120,
+  /** Drapeau CTF : rayon de prise, et retour automatique d'un drapeau tombé. */
+  flagRadius: 40,
+  flagReturnSeconds: 30,
+  /** Zone de dépôt autour de son propre drapeau à la base. */
+  flagCaptureRadius: 120,
+  /** Breakout : temps de capture d'un territoire par un seul camp, décroissance sans présence. */
+  territoryCaptureSeconds: 8,
+  territoryDecayPerSecond: 0.05,
+  territoryRadius: 260,
+  /** Breakout : points par seconde et par territoire détenu. */
+  territoryPointsPerSecond: 1,
+} as const;
+
+export const AI_BALANCE = {
+  /** Portée d'acquisition des boss et vaisseaux-mères. */
+  aggroRange: 1400,
+  /** Portée de tir des Dominators. */
+  dominatorRange: 950,
+  /** Une cible perdue de vue est poursuivie vers sa dernière position pendant ce délai. */
+  memorySeconds: 3,
+  /** Changement de point d'errance. */
+  wanderSeconds: 6,
+  /** Fallen Overlord / Mothership : distance de combat conservée. */
+  standoff: 420,
+  /** Mothership : rayon d'action autour de son point d'ancrage. */
+  mothershipLeash: 900,
+  /** Bornes dures de population IA. */
+  maxBosses: 8,
+  /** Crashers : acquisition, vitesse de charge, retour au nid au-delà de cette marge. */
+  crasherAggro: 520,
+  crasherSpeed: 190,
+  crasherNestMargin: 500,
+  crasherContact: 24,
+  alphaContact: 30,
+} as const;
+
+/** Formes du nid et variantes rares : valeurs communautaires du catalogue, à valider. */
+export const SHAPE_BALANCE = {
+  alphaPentagon: { health: 3000, reward: 3000, radius: 75 },
+  crasher: { health: 15, reward: 15, radius: 14 },
+  /** Variantes vertes : santé/XP du catalogue (`green-square`...). */
+  shiny: {
+    square: { health: 1000, reward: 1000 },
+    triangle: { health: 3000, reward: 2500 },
+    pentagon: { health: 10_000, reward: 13_000 },
+  },
+} as const;

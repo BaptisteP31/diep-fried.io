@@ -1,5 +1,11 @@
 import type {
+  ClassId,
   DeathInfo,
+  EntityId,
+  MatchPhase,
+  MatchResult,
+  ObjectiveKind,
+  TeamId,
   ModeConfig,
   PlayerCommand,
   PlayerId,
@@ -50,7 +56,30 @@ export interface PlayerProfile {
 export type SimEvent =
   | { type: 'spawn'; playerId: PlayerId }
   | { type: 'death'; death: DeathInfo }
-  | { type: 'levelUp'; playerId: PlayerId; level: number };
+  | { type: 'levelUp'; playerId: PlayerId; level: number }
+  /** Ajouts additifs des modes à objectifs ; le transport peut les ignorer. */
+  | { type: 'matchPhase'; phase: MatchPhase; round: number; result: MatchResult | null }
+  | {
+      type: 'objective';
+      objectiveId: number;
+      kind: ObjectiveKind;
+      action: ObjectiveAction;
+      team: TeamId;
+      playerId: PlayerId | null;
+    }
+  /** Tag : le joueur rejoint le camp de son tueur. */
+  | { type: 'teamChange'; playerId: PlayerId; team: TeamId }
+  | { type: 'possess'; playerId: PlayerId; entityId: EntityId | null }
+  | {
+      type: 'boss';
+      action: 'spawn' | 'death';
+      entityId: EntityId;
+      classId: ClassId;
+      killerPlayerId: PlayerId | null;
+    };
+
+export type ObjectiveAction =
+  'captured' | 'neutralized' | 'pickup' | 'drop' | 'return' | 'score' | 'destroyed';
 
 export interface SimulationOptions {
   config: ModeConfig;

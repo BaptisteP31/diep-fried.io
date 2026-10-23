@@ -2,10 +2,11 @@
 // Depuis la racine : node --import tsx packages/sim/bench/load.mjs
 import { performance } from 'node:perf_hooks';
 import { resolveModeConfig } from '../../shared/src/index.ts';
-import { createSimulation } from '../src/index.ts';
+import { createSimulation, prepareModeConfig } from '../src/index.ts';
 
 const scenario = process.argv[2] ?? 'basic';
-if (!['basic', 'swarm'].includes(scenario)) throw new Error('Expected basic or swarm');
+if (!['basic', 'swarm', 'bosses', 'domination'].includes(scenario))
+  throw new Error('Expected basic, swarm, bosses or domination');
 const paths = [
   ['sniper', 'overseer', 'overlord'],
   ['sniper', 'overseer', 'overlord'],
@@ -16,8 +17,14 @@ const paths = [
   ['sniper', 'overseer', 'necromancer'],
   ['sniper', 'overseer', 'necromancer'],
 ];
-const config = resolveModeConfig('ffa');
+// bosses : FFA, nid et cinq boss actifs ; domination : quatre Dominators, gardes de base.
+const config =
+  scenario === 'domination'
+    ? prepareModeConfig(resolveModeConfig('domination'), 17)
+    : resolveModeConfig('ffa');
 config.progression.startLevel = scenario === 'swarm' ? 45 : 15;
+if (scenario === 'bosses')
+  config.bosses = { enabled: true, firstSpawnTicks: 1, intervalTicks: 30, maxAlive: 5 };
 const sim = createSimulation({ config, seed: 17 });
 for (let id = 1; id <= 8; id++) sim.addPlayer(id, { name: `P${id}` });
 const costs = [];
@@ -26,11 +33,12 @@ let snapshots = 0;
 let entityCounts = 0;
 let peakControlled = 0;
 let peakProjectiles = 0;
+let peakAi = 0;
 const begin = performance.now();
 for (let tick = 0; tick < 900; tick++) {
   for (let id = 1; id <= 8; id++) {
     const previous = scenario === 'swarm' ? sim.snapshotFor(id) : undefined;
-    if (tick === 1 && scenario === 'basic') {
+    if (tick === 1 && scenario !== 'swarm') {
       sim.queueCommand(id, { type: 'chooseClass', classId: id % 2 ? 'twin' : 'machine-gun' });
     }
     if (scenario === 'swarm' && previous?.self.classId === 'tank') {
@@ -73,6 +81,7 @@ for (let tick = 0; tick < 900; tick++) {
   costs.push(performance.now() - start);
   if (sim.tick % config.snapshotInterval === 0) {
     const visibleProjectiles = new Map();
+    const visibleAi = new Set();
     for (let id = 1; id <= 8; id++) {
       const snapshot = sim.snapshotFor(id);
       bytes += Buffer.byteLength(JSON.stringify(snapshot));
@@ -80,8 +89,10 @@ for (let tick = 0; tick < 900; tick++) {
       entityCounts += snapshot.entities.length;
       for (const body of snapshot.entities)
         if (body.kind === 'projectile') visibleProjectiles.set(body.id, body);
+        else if (body.kind === 'tank' && body.playerId === null) visibleAi.add(body.id);
     }
     peakProjectiles = Math.max(peakProjectiles, visibleProjectiles.size);
+    peakAi = Math.max(peakAi, visibleAi.size);
     peakControlled = Math.max(
       peakControlled,
       [...visibleProjectiles.values()].filter((b) => b.family === 'drone' || b.family === 'minion')
@@ -97,6 +108,7 @@ console.log(
       ticks: sim.tick,
       peakControlled,
       peakProjectiles,
+      peakAi,
       players: 8,
       shapes: config.shapes.targetCount,
       tickRate: config.tickRate,

@@ -2,6 +2,7 @@ import type { Vec2 } from './geometry';
 import type { ClassId, EntityId, PlayerId, Tick } from './ids';
 import type { StatId, StatLevels } from './stats';
 import type { EntityState } from './entities';
+import type { MatchState } from './match';
 
 /**
  * Intention de contrôle d'un joueur. Le client envoie l'état courant de ses commandes,
@@ -27,7 +28,22 @@ export type PlayerCommand =
   | { type: 'chooseClass'; classId: ClassId }
   | { type: 'respawn' }
   /** Extension additive du protocole v1 ; autorisation uniquement par config.sandbox.cheats. */
-  | { type: 'sandbox'; action: 'levelUp' | 'cycleClass' | 'selfDestruct' | 'toggleGod' };
+  | { type: 'sandbox'; action: SandboxAction }
+  /**
+   * Ajout v1 (touche H) : prendre ou rendre le contrôle d'un Dominator ou du vaisseau-mère allié
+   * proche. Validé par le mode et la distance ; sinon ignoré.
+   */
+  | { type: 'possess' };
+
+export const SANDBOX_ACTIONS = [
+  'levelUp',
+  'cycleClass',
+  'selfDestruct',
+  'toggleGod',
+  'summonBoss',
+] as const;
+
+export type SandboxAction = (typeof SANDBOX_ACTIONS)[number];
 
 /** État privé du joueur destinataire d'un snapshot. */
 export interface SelfState {
@@ -48,8 +64,12 @@ export interface SelfState {
   classChoices: ClassId[];
   /** Demi-étendue visible en unités monde sur le plus grand axe de l'écran. */
   view: number;
-  /** Tick à partir duquel `respawn` est accepté ; `null` si vivant. */
+  /** Tick à partir duquel `respawn` est accepté ; `null` si vivant ou spectateur. */
   respawnTick: Tick | null;
+  /** Survival : éliminé ou arrivé en cours de round, sans tank jusqu'au round suivant. */
+  spectator?: boolean;
+  /** Entité spéciale pilotée via `possess` ; `entityId` la désigne aussi. */
+  possessing?: EntityId;
 }
 
 export interface LeaderboardEntry {
@@ -69,6 +89,8 @@ export interface SnapshotPayload {
   entities: EntityState[];
   /** Classement, présent quand il a changé ou périodiquement (choix de la simulation). */
   leaderboard?: LeaderboardEntry[];
+  /** État de partie des modes à objectifs ; absent ailleurs. */
+  match?: MatchState;
 }
 
 export interface DeathInfo {

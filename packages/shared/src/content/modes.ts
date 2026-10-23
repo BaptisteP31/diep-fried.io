@@ -1,4 +1,4 @@
-import type { ModeConfig, ModeId, RoomOptions } from '../model/mode';
+import type { MatchConfig, ModeConfig, ModeId, RoomOptions, TeamDefinition } from '../model/mode';
 
 /**
  * Presets de modes et résolution des options de salon.
@@ -26,25 +26,61 @@ const base: Omit<ModeConfig, 'mode'> = {
   sandbox: { cheats: false },
 };
 
+const TWO_TEAMS: TeamDefinition[] = [
+  { id: 1, color: 'blue', name: 'Bleus' },
+  { id: 2, color: 'red', name: 'Rouges' },
+];
+const FOUR_TEAMS: TeamDefinition[] = [
+  ...TWO_TEAMS,
+  { id: 3, color: 'green', name: 'Verts' },
+  { id: 4, color: 'purple', name: 'Violets' },
+];
+/** Nid central FFA : rayon en fraction du plus petit côté (résolu dans `resolveModeConfig`). */
+const NEST_RADIUS_FRACTION = 0.14;
+/** Rounds : deux joueurs minimum pour éviter une victoire solo immédiate ; 10 s de podium. */
+const match: MatchConfig = {
+  minPlayers: 2,
+  restartDelayTicks: 300,
+  timeLimitTicks: 0,
+  scoreLimit: 0,
+};
+
 const PRESETS: Record<ModeId, Omit<ModeConfig, 'mode'>> = {
-  ffa: base,
+  ffa: {
+    ...base,
+    shapes: {
+      targetCount: 0,
+      nest: { radius: 0, alphaShare: 0.01, crasherShare: 0.05 },
+      shinyChance: 0.0005,
+    },
+    // 3 min puis toutes les 10 min (proposition non vérifiée du catalogue : 10-15 min).
+    bosses: { enabled: true, firstSpawnTicks: 5400, intervalTicks: 18_000, maxAlive: 1 },
+  },
   maze: base,
-  teams2: {
+  teams2: { ...base, teams: TWO_TEAMS },
+  teams4: { ...base, teams: FOUR_TEAMS },
+  domination: { ...base, teams: TWO_TEAMS, match },
+  tag: { ...base, teams: FOUR_TEAMS, match },
+  ctf: { ...base, teams: TWO_TEAMS, match: { ...match, timeLimitTicks: 18_000, scoreLimit: 3 } },
+  breakout: {
     ...base,
-    teams: [
-      { id: 1, color: 'blue', name: 'Bleus' },
-      { id: 2, color: 'red', name: 'Rouges' },
-    ],
+    teams: TWO_TEAMS,
+    match: { ...match, timeLimitTicks: 18_000, scoreLimit: 600 },
   },
-  teams4: {
+  survival: {
     ...base,
-    teams: [
-      { id: 1, color: 'blue', name: 'Bleus' },
-      { id: 2, color: 'red', name: 'Rouges' },
-      { id: 3, color: 'green', name: 'Verts' },
-      { id: 4, color: 'purple', name: 'Violets' },
-    ],
+    maxPlayers: 10,
+    match: {
+      ...match,
+      shrink: {
+        delayTicks: 1800,
+        durationTicks: 7200,
+        finalRadiusFraction: 0.08,
+        damagePerSecond: 25,
+      },
+    },
   },
+  mothership: { ...base, teams: TWO_TEAMS, match },
   sandbox: {
     ...base,
     maxPlayers: 8,
@@ -71,11 +107,17 @@ export function resolveModeConfig(mode: ModeId, options: RoomOptions = {}): Mode
     arena,
     maxPlayers,
     shapes: {
+      ...preset.shapes,
       targetCount: Math.round(
         ((arena.width * arena.height) / 1_000_000) * SHAPES_PER_MILLION_UNITS * density,
       ),
     },
   };
+  if (preset.shapes.nest)
+    config.shapes.nest = {
+      ...preset.shapes.nest,
+      radius: Math.round(Math.min(arena.width, arena.height) * NEST_RADIUS_FRACTION),
+    };
   // Copie profonde : aucun salon ne partage d'objet avec un preset.
   return JSON.parse(JSON.stringify(config)) as ModeConfig;
 }

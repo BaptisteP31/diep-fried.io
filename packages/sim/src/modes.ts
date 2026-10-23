@@ -18,13 +18,18 @@ export interface ModeContext {
   readonly teamSizes?: ReadonlyMap<TeamId, number>;
 }
 
+/** Règle de victoire d'un mode à objectifs ; appliquée par la simulation en fin de tick. */
+export type ObjectiveRule =
+  'dominators' | 'conversion' | 'flags' | 'territories' | 'survival' | 'mothership';
+
 /**
  * Règles propres à un mode. La simulation reste générique et délègue ici les décisions
- * de camp, d'apparition et de dégâts. Les modes à objectifs (Domination, Tag...) ajouteront
- * un crochet de fin de tick et l'état d'objectif quand ils seront implémentés.
+ * de camp, d'apparition et de dégâts. `objective` active la machine de rounds et la règle
+ * de victoire correspondante (état exposé par `SnapshotPayload.match`).
  */
 export interface ModeRules {
   readonly id: ModeId;
+  readonly objective?: ObjectiveRule;
   /** Équipe d'un joueur qui rejoint le salon. */
   assignTeam(ctx: ModeContext, playerId: PlayerId): TeamId;
   /** Position d'apparition d'un tank de rayon `radius`. */
@@ -72,4 +77,10 @@ export const MODE_RULES: Readonly<Record<ModeId, ModeRules>> = {
   maze: { id: 'maze', ...freeForAll },
   teams2: { id: 'teams2', ...teams },
   teams4: { id: 'teams4', ...teams },
+  domination: { id: 'domination', objective: 'dominators', ...teams },
+  tag: { id: 'tag', objective: 'conversion', ...teams },
+  ctf: { id: 'ctf', objective: 'flags', ...teams },
+  breakout: { id: 'breakout', objective: 'territories', ...teams },
+  survival: { id: 'survival', objective: 'survival', ...freeForAll },
+  mothership: { id: 'mothership', objective: 'mothership', ...teams },
 };

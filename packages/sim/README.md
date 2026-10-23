@@ -1,4 +1,4 @@
-# Simulation FFA / Sandbox / Teams / Maze
+# Simulation FFA / Sandbox / Teams / Maze / modes à objectifs
 
 `createSimulation({ config, seed })` est le nouvel export de simulation autoritaire,
 conforme à `Simulation`, choisie par défaut par le serveur.
@@ -111,8 +111,8 @@ Le rejeu chargé couvre 8 joueurs et les 200 formes du preset FFA pendant 300 ti
 `test/spatial.test.ts` vérifie aussi des trajectoires de 2 000 unités par tick et
 les paires traversant plusieurs cellules.
 
-Le serveur utilise cette fabrique par défaut. Nid/alpha/crashers, objectifs et boss
-ne font pas partie de ce lot.
+Le serveur utilise cette fabrique par défaut. Nid, Alpha Pentagons, Crashers, objectifs et boss
+sont décrits dans la section « Modes à objectifs, IA et boss » ci-dessous.
 Les formes utilisent des collisions circulaires, une dérive initiale et une rotation,
 sans IA ni régénération. L'apparition cherche une zone dégagée pendant 128 essais au maximum, puis
 utilise une grille déterministe dans la zone autorisée. Une arène saturée retarde
@@ -184,8 +184,8 @@ Les balles simples ne reçoivent pas de métadonnées inutiles.
 Le filtre serveur Predator suit le décalage Alt. Le **rendu client de la caméra
 et des nouvelles géométries n'est pas implémenté dans ce lot**. L'invisibilité est
 une opacité et une règle de ciblage, pas une dissimulation des coordonnées réseau.
-Pas de boss, d'équipes, de murs, de contournement d'obstacles ni de commandes de triche
-ajoutés ici. Les IA suivent une cible proche sans stratégie tactique. Les missiles
+Équipes, murs, commandes de triche, objectifs et boss sont traités dans les sections
+suivantes ; il n'y a toujours pas de contournement d'obstacles. Les IA suivent une cible proche sans stratégie tactique. Les missiles
 sont des trajectoires choisies pour ce remake, sans modèle d'explosion surfacique :
 Firework blesse par ses éclats et par l'impact de la coque. La collision reste circulaire.
 Les secondaires héritent des statistiques courantes du joueur au moment du tir.
@@ -299,3 +299,162 @@ messages valides mais non autorisés sont ignorés, sans événement ni changeme
 neutralité des récompenses des gardes, spawns et formes hors murs, tirs rapides,
 LoS, drones/minions, les quatre actions et leur refus sans autorisation. Les tests
 codec couvrent les nouveaux modes et les actions inconnues/mal typées.
+
+## Modes à objectifs, IA et boss (extension additive v1)
+
+Six `ModeId` s'ajoutent : `domination`, `tag`, `ctf`, `breakout`, `survival`, `mothership`.
+`ModeRules.objective` (`dominators | conversion | flags | territories | survival | mothership`)
+active une machine de rounds ; FFA/Sandbox/Teams/Maze n'ont ni `config.match` ni
+`SnapshotPayload.match`, leur comportement est inchangé. Les règles ci-dessous sont des
+**conventions de diep-fried.io** : la documentation publique ne fixe ni CTF, ni Breakout, ni
+les valeurs ; aucune n'est présentée comme la règle exacte du jeu original.
+
+### Cartes et configuration
+
+`prepareModeConfig` génère les bases (`generateTeamLayout`, 2 camps, ou 4 pour Tag) puis
+`map.objectives: ObjectiveSite[]` (`kind, team, x, y, radius, classId?`), copiés par la
+simulation et envoyés dans `room.joined.config`. Domination : quatre Dominators neutres aux
+points cardinaux à `0.28 × côté` du centre (Destroyer nord, Gunner est/ouest, Trapper sud).
+CTF : un drapeau par camp, 250 unités devant sa base. Mothership : un vaisseau-mère par camp,
+450 unités devant sa base. Breakout : cinq territoires (centre et quatre points à 36/64 % ×
+25/75 %), rayon `min(260, 0.06 × côté)`. Des objectifs fournis explicitement sont préservés.
+
+`config.match` : `minPlayers` (2 par défaut, **explicite** pour éviter une victoire solo
+immédiate), `restartDelayTicks` (300), `timeLimitTicks` (0 = illimité ; CTF/Breakout 18 000),
+`scoreLimit` (CTF 3 captures, Breakout 600 points) et `shrink` pour Survival.
+
+### Rounds
+
+- `waiting` tant que `players < minPlayers` : combat libre, objectifs IA invulnérables et
+  inactifs (exposé par `spawnProtected`), aucune règle de victoire, respawn ordinaire.
+- Passage à `playing` : **remise à zéro** puis round `n + 1`. Un départ sous le minimum
+  ramène à `waiting` (sauf Survival, qui se termine par élimination).
+- Victoire : une seule par round (`finish` ignoré hors `playing`). `finished` dure
+  `restartDelayTicks` : plus aucun dégât (`canDamage` faux), donc ni XP ni objectif ; les IA
+  cessent de viser. Limite de temps : meilleur score de camp, sinon égalité (`team: null`).
+- Remise à zéro : joueurs connectés conservés ; score au seuil de `startLevel`, Tank, stats et
+  dieu effacés ; **tous** les projectiles, IA, compteurs de budget et pilotages retirés, gardes
+  de base et objectifs recréés, joueurs réapparus dans le même tick (identifiants d'entité
+  neufs). Tag rééquilibre les camps par identifiant croissant. Formes conservées. La
+  configuration n'est jamais modifiée : la carte de `room.joined` reste valable.
+
+### Règles par mode
+
+- **Domination** : un Dominator est un tank IA fixe (4 000 PV). Détruit alors qu'il est neutre
+  par un camp déclaré, il passe à ce camp ; détruit alors qu'il est détenu, il redevient
+  neutre. Santé restaurée, tirs en vol retirés, pilote éjecté, 1 000 XP au coup fatal. Neutre,
+  il ne tire pas ; détenu, il vise l'ennemi visible le plus proche (950 unités). Victoire dès
+  qu'un camp détient tous les Dominators. Pas d'Arena Closers.
+- **Tag** (4 camps) : un joueur tué par un camp déclaré différent du sien (joueur, tir, garde
+  de base) rejoint ce camp ; suicide et formes ne convertissent pas. Victoire quand un seul
+  camp contient tous les joueurs connectés. Un arrivant rejoint le camp le moins peuplé.
+- **CTF** : contact d'un ennemi avec un drapeau à la base ou tombé : prise (un drapeau par
+  porteur). Mort, déconnexion ou `possess` du porteur : drapeau tombé sur place, retour
+  automatique après 30 s ; un allié qui le touche le renvoie aussitôt. Capture : porter le
+  drapeau adverse à moins de 120 unités de son propre drapeau **à la base**.
+- **Breakout** (convention propre au remake) : un territoire n'est capturé que par la présence
+  exclusive de tanks vivants d'un seul camp, en 8 s ; l'avancement adverse doit d'abord
+  redescendre ; plusieurs camps = gel (`contested`) ; personne = décroissance 0.05/s. La capture
+  donne directement le territoire. Chaque territoire détenu rapporte 1 point/s (compteur de
+  ticks entier). Victoire en détenant tous les territoires ou au `scoreLimit`.
+- **Survival** (FFA, 10 joueurs) : une mort en `playing` élimine jusqu'au round suivant
+  (`self.spectator`, `respawnTick: null`, `respawn` refusé) ; un arrivant en cours de round est
+  spectateur. Dernier joueur non éliminé vainqueur (`result.playerId`), égalité si aucun.
+  Zone sûre centrée : rayon initial demi-diagonale, réduit linéairement après 60 s pendant 4
+  min jusqu'à `0.08 × côté` ; hors zone, 25 PV/s (le mode dieu y résiste).
+- **Mothership** : un vaisseau-mère IA par camp (7 000 PV du catalogue, 16 drones). Il défend
+  son ancrage (laisse 900, distance de combat 420) et guide ses drones vers la menace.
+  Victoire quand un seul camp conserve son vaisseau ; aucun respawn du vaisseau dans le round.
+
+### Commande `possess` (touche H) et IA
+
+`{ type: 'possess' }` bascule le contrôle d'un Dominator ou du vaisseau-mère **allié**, non
+piloté, à au plus 120 unités bord à bord, en `waiting`/`playing` des modes Domination et
+Mothership. Ailleurs, sans tank ou hors portée : ignorée. Pendant le pilotage, le tank du joueur
+est garé hors du monde (drones nettoyés, drapeau éventuellement lâché), ses intentions pilotent
+l'IA (visée relative à l'IA, déplacement selon sa vitesse : nul pour un Dominator) et ses
+kills/XP lui sont crédités. `self.entityId` et `self.possessing` désignent l'IA ;
+`upgradeStat`, `chooseClass` et `respawn` sont refusés. Une seconde commande, la capture, la
+destruction de l'IA, la déconnexion ou la remise à zéro rendent le tank, posé au contact de
+l'IA par un mouvement balayé (pas de traversée de mur). Limite : la pose peut chevaucher un
+autre corps, séparé au tick suivant ; aucune protection n'est accordée.
+
+Toutes les IA (Dominators, vaisseaux-mères, boss) sont des **tanks ordinaires** de classe
+spéciale (`TankState.playerId === null`), endommageables, visibles dans les snapshots, avec
+canons, drones, pièges, budgets et collisions communs. Une fiche pilote synthétique (stats
+fixes) produit un `PlayerInput` par tick. Cible : tank hostile visible (opacité ≥ 0.15, ligne de
+vue, non protégé) le plus proche dans la portée (1 400 unités), **conservée** tant qu'elle reste
+valide ; perdue de vue, sa dernière position est poursuivie 3 s puis oubliée. Mémoire bornée à
+une cible et un point d'errance par IA. Sans cible : errance (6 s par point, nid pour le
+Guardian). Aucun pathfinding. Les formes neutres et les IA ne s'infligent pas de dégâts.
+
+### Boss classiques, nid et variantes rares
+
+`config.bosses = { enabled, firstSpawnTicks, intervalTicks, maxAlive, pool? }`. Preset FFA :
+premier boss à 3 min, puis toutes les 10 min, un vivant (proposition non vérifiée du catalogue :
+10–15 min). Une échéance tente une apparition et programme la suivante, sans rattrapage ; en
+mode à rounds, seulement en `playing`. Rotation déterministe de `pool` (défaut : les cinq).
+Cap dur de 8 boss, y compris pour `sandbox summonBoss` (cheats requis, à 600 unités du joueur,
+hors `maxAlive`). Apparition au nid (Guardian) ou au bord de l'arène, hors murs, bases et corps.
+
+| Boss            | Comportement (classes dans `shared/src/content/special.ts`)                  |
+| --------------- | ---------------------------------------------------------------------------- |
+| Guardian        | Triangle géant, 24 drones triangulaires rapides de 10 s guidés vers la cible |
+| Summoner        | Carré géant, quatre producteurs, 28 drones carrés guidés                     |
+| Defender        | Triangle géant, trois lanceurs de pièges et trois tourelles automatiques     |
+| Fallen Overlord | Quatre producteurs, 12 drones guidés ; garde 420 unités de distance          |
+| Fallen Booster  | Charge directe, propulsion par les quatre canons arrière, dégâts de corps ×3 |
+
+3 000 PV, 12 000 XP au coup fatal, régénération ordinaire ; boss neutres (équipe 0). Leurs drones
+et tirs disparaissent avec eux. Les silhouettes (`SpecialClassDefinition.body`) sont un contrat
+de contenu pour le rendu ; le collisionneur reste circulaire.
+
+`shapes.nest = { radius, alphaShare, crasherShare }` (FFA : rayon `0.14 × côté`, 1 % et 5 % de
+`targetCount`) entretient Alpha Pentagons (3 000 PV/XP, rayon 75) et Crashers (15 PV/XP,
+24 PV/s de contact) au centre, en plus de `targetCount`. Un Crasher charge à 190 unités/s le tank
+hostile visible le plus proche à moins de 520 unités, si ce tank est à moins de `rayon + 500`
+du centre ; sinon il revient au nid. `shapes.shinyChance` (FFA 0.0005) produit les variantes
+vertes du catalogue (carré 1 000/1 000, triangle 3 000/2 500, pentagone 10 000/13 000 PV/XP).
+
+Nid, variantes, IA et boss tirent sur un **second flux `Rng`** dérivé de la graine : la
+séquence historique des formes ordinaires est inchangée quand ces options sont absentes.
+Coefficients expérimentaux nommés : `OBJECTIVE_BALANCE`, `AI_BALANCE`, `SHAPE_BALANCE`
+(`src/balance.ts`) et `SPECIAL_CLASS_DEFINITIONS`.
+
+### Contrats réseau ajoutés (additifs, protocole v1)
+
+- `SnapshotPayload.match?: MatchState` : phase, round, `phaseTick`, `endTick`, `minPlayers`,
+  `players`, `result`, `scores` (`team`, `score`, `players`) et `objectives`, plus `survivors`
+  et `safeZone` en Survival. `ObjectiveState` : `id`, `kind`, `x`, `y`, `radius`, `team`,
+  `entityId`, `progress` et, selon le type, `health`/`maxHealth`/`possessedBy`, `capturingTeam`/`contested`,
+  ou `flag` (`status`, `carrierId`, `homeX`, `homeY`, `returnTick`).
+- `SelfState.spectator?`, `SelfState.possessing?` ; `PlayerCommand { type: 'possess' }` ;
+  action Sandbox `summonBoss` (`SANDBOX_ACTIONS`).
+- `SimEvent` : `matchPhase`, `objective` (actions `captured`, `neutralized`, `pickup`, `drop`,
+  `return`, `score`, `destroyed`), `teamChange`, `possess`, `boss` (`spawn`, `death`). Le
+  serveur actuel ne relaie que `death` ; les autres sont ignorés, l'état étant porté par les
+  snapshots.
+- `getClassDefinition` résout aussi les classes spéciales, absentes de `CLASS_DEFINITIONS` et
+  des choix d'amélioration ; `BarrelDefinition.bodyShape?` choisit la forme des drones.
+
+### Limites connues
+
+Pas d'Arena Closers ni de fermeture d'arène ; pas de pathfinding ; pas d'IA tactique (pas
+d'esquive, de prédiction de tir ni de coordination). Rendu client non implémenté pour les
+objectifs, drapeaux, territoires, zone sûre, silhouettes spéciales et HUD de round : le client
+actuel dessine les IA comme des tanks circulaires avec leurs canons. Un porteur de drapeau ne
+subit aucun ralentissement. En `waiting`, un drapeau porté n'est plus mis à jour (remis à zéro
+au départ du round). Le Tag accepte qu'un arrivant ranime un camp vide. Survival n'a pas de
+file d'attente de lobby. Les coefficients ne sont pas calibrés par playtest.
+
+Mesures `bench/load.mjs` (900 ticks, 8 joueurs, 200 formes, cette machine, indicatives) :
+`basic` 0.33 ms/tick moyen (p95 0.64), `swarm` 3.3 ms (p95 3.9), `bosses` (cinq boss actifs et
+nid) 2.2 ms (p95 2.8), `domination` 0.56 ms (p95 1.0). Sur la même machine, la base
+précédente mesurait `basic` 0.28–0.30 ms et `swarm` 2.9–3.0 ms : environ 8 % de surcoût hors
+nid, 10–15 % avec le nid FFA (corps et charges supplémentaires).
+
+`test/objectives.test.ts` couvre cartes, attente/minimum, capture/neutralisation/possession,
+victoire unique, gel des dégâts et remise à zéro, retour en attente, conversion Tag, prise/chute/
+retour/capture/délai CTF, territoires contestés et points, spectateurs et zone Survival,
+destruction et pilotage du vaisseau-mère, refus de `possess`, attaque des cinq boss, mort de boss
+et nettoyage de ses drones, bornes de population, nid/variantes et rejeu déterministe.
