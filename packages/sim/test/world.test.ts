@@ -291,6 +291,26 @@ describe('armes et balles', () => {
     expect(angles).toEqual(run());
   });
 
+  it('rend chaque point de Reload utile à 30 Hz sans rafale de rattrapage', () => {
+    const shotsOverTenSeconds = (classId: 'tank' | 'machine-gun', reload: number) => {
+      const sim = create(45);
+      if (classId !== 'tank') sim.queueCommand(1, { type: 'chooseClass', classId });
+      for (let i = 0; i < reload; i++) sim.queueCommand(1, { type: 'upgradeStat', stat: 'reload' });
+      sim.step();
+      input(sim, 1, { fire: true });
+      let shots = 0;
+      for (let i = 0; i < 300; i++) {
+        sim.step();
+        if (own(sim).barrelShots[0] === sim.tick) shots++;
+      }
+      return shots;
+    };
+    for (const classId of ['tank', 'machine-gun'] as const) {
+      const counts = Array.from({ length: 8 }, (_, reload) => shotsOverTenSeconds(classId, reload));
+      for (let i = 1; i < counts.length; i++) expect(counts[i]).toBeGreaterThan(counts[i - 1]!);
+    }
+  });
+
   it('expire les balles au tick prévu et supprime les tirs quittant l’arène', () => {
     const sim = create(45, 1, (config) => {
       config.arena = { width: 6000, height: 6000 };
@@ -552,6 +572,39 @@ describe('combat, formes et vies', () => {
     expect(sim.snapshotFor(1)!.entities.filter((body) => body.kind === 'shape')).toHaveLength(1);
     step(sim, 2);
     expect(sim.snapshotFor(1)!.self.score).toBe(10);
+  });
+
+  it('ramène une forme poussée par un tank à sa vitesse de dérive', () => {
+    const sim = create(1, 1, (config) => {
+      config.arena = { width: 400, height: 400 };
+      config.shapes.targetCount = 1;
+    });
+    const shapeId = sim.snapshotFor(1)!.entities.find((body) => body.kind === 'shape')!.id;
+    const shape = () => sim.snapshotFor(1)!.entities.find((body) => body.id === shapeId)!;
+    // Poussée pendant la protection de spawn : contact solide, sans dégât.
+    let pushed = 0;
+    for (let i = 0; i < 50; i++) {
+      const target = shape();
+      const tank = own(sim);
+      const distance = Math.hypot(target.x - tank.x, target.y - tank.y);
+      input(sim, 1, {
+        move: { x: (target.x - tank.x) / distance, y: (target.y - tank.y) / distance },
+      });
+      sim.step();
+      pushed = Math.max(pushed, Math.hypot(shape().vx, shape().vy));
+    }
+    // Le tank s'écarte ensuite : seule la décroissance propre à la forme agit.
+    for (let i = 0; i < 30; i++) {
+      const target = shape();
+      const tank = own(sim);
+      const distance = Math.hypot(target.x - tank.x, target.y - tank.y);
+      input(sim, 1, {
+        move: { x: (tank.x - target.x) / distance, y: (tank.y - target.y) / distance },
+      });
+      sim.step();
+    }
+    expect(pushed).toBeGreaterThan(60);
+    expect(Math.hypot(shape().vx, shape().vy)).toBeLessThanOrEqual(28);
   });
 
   it('touche un tank à très faible fréquence sans répétition de dégâts d’une balle pénétrante', () => {
