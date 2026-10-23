@@ -18,4 +18,8 @@ Les références locales `docs/research/asset-collection/reference-only/` sont i
 
 ## État
 
-Initialisation : recherches et ressources libres collectées. Architecture et spécification à produire avant délégation des composants dépendants.
+Recherches, ressources libres et catalogue documentaire intégrés. Revue indépendante du catalogue intégrée ; 54 classes uniques et atteignables, avec évolutions réciproques et tiers croissants contrôlés par le coordinateur. Architecture et socle en cours dans `t3/architecture-scaffold`.
+
+## Arbitrage des jalons
+
+La numérotation des jalons ci-dessus fait référence pour la coordination. Les mentions MVP/v1.5/v2 dans la spécification classent les lots de contenu : elles ne retirent pas les objectifs et boss du périmètre complet. Les modes CTF et Breakout restent explicitement au backlog avec règles à documenter. Les valeurs de physique proposées dans le catalogue ne contraignent pas l'architecture avant validation et calibration.
