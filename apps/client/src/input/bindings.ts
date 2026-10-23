@@ -11,12 +11,12 @@ export type KeyAction =
   | { kind: 'toggle'; action: ToggleAction }
   | { kind: 'stat'; stat: StatId };
 
-export type KeyBindings = Readonly<Record<string, KeyAction>>;
+export type KeyBindings = Record<string, KeyAction>;
 
 const held = (action: HeldAction): KeyAction => ({ kind: 'held', action });
 const toggle = (action: ToggleAction): KeyAction => ({ kind: 'toggle', action });
 
-export const DEFAULT_BINDINGS: KeyBindings = {
+export const DEFAULT_BINDINGS: Readonly<Record<string, KeyAction>> = {
   KeyW: held('up'),
   ArrowUp: held('up'),
   KeyS: held('down'),
@@ -36,10 +36,128 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   ),
 };
 
+export const BINDINGS_STORAGE_KEY = 'diep-fried:bindings';
+
+/** Noms français lisibles pour les actions configurables. */
+export const ACTION_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  up: 'Avancer (Haut)',
+  down: 'Reculer (Bas)',
+  left: 'Aller à gauche',
+  right: 'Aller à droite',
+  fire: 'Tirer',
+  alt: 'Action secondaire (repousser drones)',
+  autoFire: 'Tir automatique [E]',
+  autoSpin: 'Rotation automatique [C]',
+  upgradeTree: "Arbre d'évolution [Y]",
+  healthRegen: '1 - Régénération de santé',
+  maxHealth: '2 - Santé max',
+  bodyDamage: '3 - Dégâts de corps',
+  bulletSpeed: '4 - Vitesse des tirs',
+  bulletPenetration: '5 - Pénétration des tirs',
+  bulletDamage: '6 - Dégâts des tirs',
+  reload: '7 - Rechargement',
+  movementSpeed: '8 - Vitesse de déplacement',
+};
+
+function getStorage(): Storage | null {
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage;
+    if (
+      typeof globalThis !== 'undefined' &&
+      'localStorage' in globalThis &&
+      (globalThis as { localStorage?: Storage }).localStorage
+    ) {
+      return (globalThis as { localStorage: Storage }).localStorage;
+    }
+  } catch {
+    // Navigateur en mode privé strict ou sans accès
+  }
+  return null;
+}
+
 /** Direction de déplacement unitaire (ou nulle) à partir des actions maintenues. */
 export function moveIntent(heldActions: ReadonlySet<HeldAction>): Vec2 {
   const x = Number(heldActions.has('right')) - Number(heldActions.has('left'));
   const y = Number(heldActions.has('down')) - Number(heldActions.has('up'));
   const length = Math.hypot(x, y);
   return length === 0 ? { x: 0, y: 0 } : { x: x / length, y: y / length };
+}
+
+/**
+ * Charge les touches depuis le localStorage, ou renvoie les raccourcis par défaut.
+ */
+export function loadBindings(storageOverride?: Storage): KeyBindings {
+  try {
+    const storage = storageOverride ?? getStorage();
+    if (!storage) return { ...DEFAULT_BINDINGS };
+    const raw = storage.getItem(BINDINGS_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_BINDINGS };
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return { ...DEFAULT_BINDINGS };
+    return { ...DEFAULT_BINDINGS, ...parsed };
+  } catch {
+    return { ...DEFAULT_BINDINGS };
+  }
+}
+
+/**
+ * Enregistre les raccourcis dans le localStorage.
+ */
+export function saveBindings(bindings: KeyBindings, storageOverride?: Storage): void {
+  try {
+    const storage = storageOverride ?? getStorage();
+    if (!storage) return;
+    storage.setItem(BINDINGS_STORAGE_KEY, JSON.stringify(bindings));
+  } catch (err) {
+    console.warn('[input] impossible de sauvegarder les touches :', err);
+  }
+}
+
+/**
+ * Réinitialise les raccourcis aux valeurs par défaut.
+ */
+export function resetBindings(storageOverride?: Storage): KeyBindings {
+  try {
+    const storage = storageOverride ?? getStorage();
+    if (storage) storage.removeItem(BINDINGS_STORAGE_KEY);
+  } catch {
+    // ignorer
+  }
+  return { ...DEFAULT_BINDINGS };
+}
+
+/**
+ * Traduit un `KeyboardEvent.code` en nom de touche plus familier en français.
+ */
+export function formatKeyCode(code: string): string {
+  if (code.startsWith('Key')) {
+    const letter = code.slice(3);
+    // Indications pour les touches AZERTY vs QWERTY courantes
+    if (letter === 'W') return 'Z / W';
+    if (letter === 'A') return 'Q / A';
+    return letter;
+  }
+  if (code.startsWith('Digit')) return code.slice(5);
+  switch (code) {
+    case 'Space':
+      return 'Espace';
+    case 'ArrowUp':
+      return '↑';
+    case 'ArrowDown':
+      return '↓';
+    case 'ArrowLeft':
+      return '←';
+    case 'ArrowRight':
+      return '→';
+    case 'ShiftLeft':
+      return 'Maj Gauche';
+    case 'ShiftRight':
+      return 'Maj Droite';
+    case 'ControlLeft':
+      return 'Ctrl Gauche';
+    case 'ControlRight':
+      return 'Ctrl Droite';
+    default:
+      return code;
+  }
 }
