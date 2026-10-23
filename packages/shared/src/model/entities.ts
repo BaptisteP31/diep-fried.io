@@ -36,15 +36,17 @@ export interface TankState extends EntityBase {
   opacity: number;
   /** Tick du dernier tir, par index de canon de la classe (-1 si jamais). Sert au recul visuel. */
   barrelShots: Tick[];
+  /** Orientation monde des canons autonomes ; absent sur les anciens snapshots. */
+  barrelAngles?: number[];
+  /** Décalage monde de caméra demandé par Predator + Alt, facultatif pour le rendu. */
+  cameraOffset?: { x: number; y: number };
   /** Protection d'apparition active : le client fait clignoter le tank. */
   spawnProtected: boolean;
 }
 
 /**
- * Familles de projectiles. Seul `bullet` est requis au jalon 2 ;
- * les autres sont réservées pour que rendu et protocole n'aient pas à changer de forme.
- * Les familles portant des canons (`missile`, `minion`) ajouteront `barrelShots` et
- * un identifiant de corps en champs optionnels.
+ * Familles simulées au jalon 3. Les métadonnées des corps armés et des carrés
+ * convertis sont optionnelles pour préserver les anciens snapshots.
  */
 export type ProjectileFamily = 'bullet' | 'drone' | 'trap' | 'missile' | 'minion';
 
@@ -55,6 +57,10 @@ export interface ProjectileState extends EntityBase {
   /** Présents pour les projectiles dont la santé est affichée (drones, minions). */
   health?: number;
   maxHealth?: number;
+  /** Métadonnées additives pour les corps armés et drones convertis. */
+  bodyShape?: 'circle' | 'triangle' | 'square';
+  classId?: ClassId;
+  barrelShots?: Tick[];
 }
 
 export type ShapeKind = 'square' | 'triangle' | 'pentagon' | 'alphaPentagon' | 'crasher';

@@ -1,6 +1,6 @@
 # Architecture de diep-fried.io
 
-État : jalon 1 (contrats et socle exécutable). Ce document fait référence pour l'API partagée ; toute modification d'un contrat listé ici passe par le coordinateur et met ce fichier à jour dans le même commit.
+État : contrats du jalon 1, simulation de classes du jalon 3 (ajouts optionnels ci-dessous). Ce document fait référence pour l'API partagée ; toute modification d'un contrat listé ici passe par le coordinateur et met ce fichier à jour dans le même commit.
 
 Rappel : toutes les constantes numériques du dépôt (tick, tailles, santé, vitesses, délais, densités) sont des **choix de diep-fried.io**, pas des mesures du jeu original. Seules les couleurs de `apps/client/src/render/palette.ts` proviennent du relevé `docs/research/rendering-assets/verified-css-tokens.json`.
 
@@ -72,8 +72,8 @@ Les définitions TypeScript font foi ; cette section résume leur sens. Point d'
 - `ClassId` : slug `^[a-z][a-z0-9-]{0,31}$`, jamais un identifiant numérique historique.
 - `STAT_IDS` : ordre contractuel des 8 statistiques (touches 1 à 8) : `healthRegen, maxHealth, bodyDamage, bulletSpeed, bulletPenetration, bulletDamage, reload, movementSpeed`.
 - `EntityState = TankState | ProjectileState | ShapeState`, discriminée par `kind`. Champs communs : `id, x, y, vx, vy, angle, radius, team`.
-  - `TankState` : `playerId | null`, `name`, `classId`, `level`, `score`, `health`, `maxHealth`, `opacity`, `barrelShots` (tick du dernier tir par canon, pour le recul visuel), `spawnProtected`.
-  - `ProjectileState` : `family` (`bullet | drone | trap | missile | minion`), `ownerId`, `health?`, `maxHealth?`.
+  - `TankState` : `playerId | null`, `name`, `classId`, `level`, `score`, `health`, `maxHealth`, `opacity`, `barrelShots` (tick du dernier tir par canon, pour le recul visuel), `spawnProtected`. Ajouts optionnels : `barrelAngles` (orientations monde des canons autonomes, tableau de même longueur que `barrelShots`) et `cameraOffset: { x, y }` (décalage monde demandé par Predator + Alt). Le filtre serveur suit ce décalage ; le rendu client doit encore le consommer.
+  - `ProjectileState` : `family` (`bullet | drone | trap | missile | minion`), `ownerId`, `health?`, `maxHealth?`. Ajouts optionnels : `bodyShape?: circle | triangle | square`, `classId?` (classe de lancement), `barrelShots?` pour missiles/minions. Les tirs secondaires gardent comme `ownerId` le tank racine, pour attribution, équipes et nettoyage. Tous ces ajouts sont facultatifs ; les anciens snapshots restent valides, sans changement de version ni de commande/codec.
   - `ShapeState` : `shape` (`square | triangle | pentagon | alphaPentagon | crasher`), `shiny`, `health`, `maxHealth`.
 - `PlayerInput` : `{ seq, move: {x,y} ∈ [-1,1]², aim: {x,y} relatif au tank (≤ 10 000), fire, alt }`. État maintenu, valable jusqu'au suivant ; `seq` strictement croissant par connexion (des trous sont permis).
 - `PlayerCommand` : `upgradeStat { stat }`, `chooseClass { classId }`, `respawn`. Validées par la simulation, ignorées si impossibles.
@@ -135,9 +135,9 @@ type SimulationFactory = (options: { config: ModeConfig; seed: number }) => Simu
 
 ### 4.4 Contenu (`packages/shared/src/content`)
 
-- `ClassDefinition` : `id, name, level, upgradesTo, barrels, statCaps?, view, speed, droneLimit?`.
-- `BarrelDefinition` (repère local, unités = rayon du corps) : `angle, offset, length, width, tipWidth?, delay, projectile` et multiplicateurs `reload, damage, penetration, speed, spread, recoil`. La même définition sert à la simulation (tirs) et au rendu (canons, vignettes, arbre).
-- `STARTING_CLASS = 'tank'` ; seul `tank` est défini au jalon 1. `DEFAULT_STAT_CAP = 7`.
+- `ClassDefinition` : `id, name, level, upgradesTo, barrels, statCaps?, view, speed, droneLimit?`. Paramètres optionnels de classe : `dronesPerReload`, `bodyHealth`, `bodyDamage`, `mass`, `stealth { delay, fade }`, `altCameraDistance`.
+- `BarrelDefinition` (repère local, unités = rayon du corps) : `angle, offset, length, width, tipWidth?, delay, projectile` et multiplicateurs `reload, damage, penetration, speed, spread, recoil`. La même définition sert à la simulation (tirs) et au rendu (canons, vignettes, arbre). Paramètres optionnels de canon : `pellets`, `auto`, `autonomous`, `conversionOnly`, `lifetime`, `radius`, `missile` (`skimmer | rocketeer | glider | firework`).
+- `STARTING_CLASS = 'tank'` ; 54 classes du catalogue sont définies, réparties 1/4/13/36 aux niveaux 1/15/30/45, toutes accessibles par des arêtes validées. `DEFAULT_STAT_CAP = 7` ; corps Smasher à 10 et statistiques de tir interdites remboursées. Les règles détaillées et limites sont dans `packages/sim/README.md`.
 - `resolveModeConfig(mode, options)` renvoie une copie indépendante du preset.
 
 ### 4.5 Serveur (variables d'environnement)
@@ -153,14 +153,14 @@ type SimulationFactory = (options: { config: ModeConfig; seed: number }) => Simu
 
 `GET /healthz` → `{ status: "ok", protocol, version, uptimeSeconds, rooms, players }`.
 
-## 5. Familles et modes prévus
+## 5. Familles implémentées et modes prévus
 
-Rien n'est codé pour ces familles, mais les contrats les accueillent sans changement de forme :
+Les familles de classes sont implémentées dans la simulation ; les modes listés plus bas restent des extensions :
 
-- **Drones** : `ProjectileState.family = 'drone'` avec `health`, `ClassDefinition.droneLimit`, guidage par `PlayerInput.aim` (point visé) et `alt` (repousser). Necromancer : drones carrés convertis, couleur dédiée côté client.
+- **Drones** : `ProjectileState.family = 'drone'` avec `health`, `ClassDefinition.droneLimit`, guidage avec `fire` vers `PlayerInput.aim` (point visé) et `alt` (repousser), défense autonome au repos et portée bornée. Necromancer : conversion de carrés par contact du tank ou de ses drones, capacité `14 + 4 × Reload` (42 au plafond).
 - **Pièges** : `family = 'trap'`, frottement fort et longue durée de vie, définis par canon (`projectile: 'trap'`).
-- **Missiles et minions** : `family = 'missile' | 'minion'` ; ajouteront `barrelShots` et un identifiant de corps optionnels quand ils seront implémentés.
-- **Tourelles automatiques, Smasher, invisibilité** : champs à ajouter à `ClassDefinition` (`autoTurrets`, corps à pointes) ; `TankState.opacity` existe déjà.
+- **Missiles et minions** : `family = 'missile' | 'minion'` ; portent les champs optionnels `barrelShots`, `classId`, `bodyShape`. Factory produit des minions armés ; les missiles tirent des balles secondaires ou explosent en éclats.
+- **Tourelles automatiques, Smasher, invisibilité** : pilotés par les paramètres de classe/canon ci-dessus ; `TankState.opacity` porte le fondu. Les tourelles choisissent la cible hostile visible la plus proche. Le rendu des géométries avancées reste un lot client distinct.
 - **Équipes (2/4 Teams)** : `ModeConfig.teams` + `map.zones` (`base`, `spawn`), `ModeRules.assignTeam` équilibre, `canDamage` protège les alliés.
 - **Maze** : `map.walls` (rectangles), envoyés une fois dans `room.joined` ; collisions dans la simulation, dessin côté client.
 - **Modes à objectifs (Domination, Tag, CTF…)** : nouveau `ModeId` + preset, crochet de fin de tick dans `ModeRules`, état d'objectif ajouté au snapshot par un champ optionnel.
