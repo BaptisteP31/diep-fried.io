@@ -1,0 +1,1709 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "meta": {
+    "title": "diep-fried.io Content Catalog & Completeness Matrix Data",
+    "version": "1.0.0",
+    "generatedDate": "2026-10-23",
+    "description": "Exhaustive documentary catalog of playable classes, special entities, weapon families, upgrade paths, shapes, bosses, stats, and game modes for diep-fried.io.",
+    "verificationCategories": {
+      "verified": "Directly observed and measured in browser or client assets",
+      "documented": "Sourced from public dated documentation (Fandom Wiki 2016-2026, DiepInDepth, changelogs)",
+      "estimated": "Game design parameter chosen specifically for diep-fried.io where original math was not publicly verifiable",
+      "unresolved": "Known ambiguous or version-dependent mechanic requiring empirical calibration"
+    }
+  },
+  "reconciliation51vs54": {
+    "summary": "Resolution of the class count delta between preliminary inventory (51 tanks) and official tier count (54 normal tanks).",
+    "historicalContext": "The preliminary inventory in docs/research/diep-io-inventaire.md noted 51 tanks: 1 Tier 1, 4 Tier 2, 12 Tier 3, and 34 Tier 4. Official game documentation confirms 54 normal playable tanks.",
+    "deltaIdentified": [
+      {
+        "tankId": "shotgun",
+        "name": "Shotgun",
+        "tier": 3,
+        "levelRequirement": 30,
+        "parentBranch": "machine-gun",
+        "missingInPreliminary": "Omitted from preliminary Tier 3 list (brought Tier 3 count from 12 to 13)."
+      },
+      {
+        "tankId": "pellet-shot",
+        "name": "Pellet Shot",
+        "tier": 4,
+        "levelRequirement": 45,
+        "parentBranch": "shotgun",
+        "missingInPreliminary": "Omitted from preliminary Tier 4 list (shotgun upgrade with 30 pellets burst)."
+      },
+      {
+        "tankId": "dual-barrel",
+        "name": "Dual-Barrel",
+        "tier": 4,
+        "levelRequirement": 45,
+        "parentBranch": "shotgun",
+        "missingInPreliminary": "Omitted from preliminary Tier 4 list (shotgun upgrade with dual alternating/simultaneous cannons and heavy recoil)."
+      }
+    ],
+    "tierCounts": {
+      "tier1": 1,
+      "tier2": 4,
+      "tier3": 13,
+      "tier4": 36,
+      "totalNormalPlayableTanks": 54
+    },
+    "tierJumpingExceptions": [
+      {
+        "tankId": "smasher",
+        "fromTier": 1,
+        "toTier": 3,
+        "fromLevel": 1,
+        "atLevel": 30,
+        "note": "Upgrades directly from basic Tank at level 30, skipping Tier 2."
+      },
+      {
+        "tankId": "sprayer",
+        "fromTier": 2,
+        "toTier": 4,
+        "fromLevel": 15,
+        "atLevel": 45,
+        "note": "Upgrades directly from Machine Gun at level 45, skipping Tier 3 (was Tier 3 in July 2016, moved to Tier 4 on July 31, 2016)."
+      },
+      {
+        "tankId": "auto-tank",
+        "fromTier": 1,
+        "toTier": 4,
+        "fromLevel": 1,
+        "atLevel": 45,
+        "note": "Upgrades directly from basic Tank at level 45, skipping Tier 2 and Tier 3."
+      }
+    ]
+  },
+  "weaponFamilies": {
+    "single-cannon": {
+      "name": "Single Cannon / Direct Fire",
+      "description": "Standard forward-facing barrel delivering focused linear projectiles with balanced speed, penetration, and recoil.",
+      "representativeTanks": [
+        "tank"
+      ]
+    },
+    "twin-spammer": {
+      "name": "Twin & Multi-Barrel Spammers",
+      "description": "Multiple parallel or angled forward barrels providing high bullet density, area suppression, and significant combined recoil thrust.",
+      "representativeTanks": [
+        "twin",
+        "triple-shot",
+        "triplet",
+        "penta-shot",
+        "spread-shot",
+        "octo-tank",
+        "twin-flank",
+        "triple-twin"
+      ]
+    },
+    "sniper": {
+      "name": "Sniper & Long-Range Recon",
+      "description": "Elongated barrels firing high-velocity, high-damage bullets with lower rate of fire and elevated Field of View (FOV).",
+      "representativeTanks": [
+        "sniper",
+        "assassin",
+        "ranger",
+        "stalker",
+        "hunter",
+        "predator",
+        "streamliner"
+      ]
+    },
+    "heavy-cannon": {
+      "name": "Heavy Cannon & High Recoil",
+      "description": "Large-bore barrels firing high-inertia, high-damage or high-recoil projectiles, used for burst damage, rocket thrusters, or artillery.",
+      "representativeTanks": [
+        "machine-gun",
+        "destroyer",
+        "hybrid",
+        "annihilator",
+        "skimmer",
+        "rocketeer",
+        "glider",
+        "firework",
+        "sprayer"
+      ]
+    },
+    "shotgun-burst": {
+      "name": "Shotgun & Pellet Spread",
+      "description": "Wide burst firing volleys of miniature pellets with high spread, high close-quarters lethality, and significant knockback/recoil.",
+      "representativeTanks": [
+        "shotgun",
+        "pellet-shot",
+        "dual-barrel"
+      ]
+    },
+    "drone-controller": {
+      "name": "Drone & Minion Controller",
+      "description": "Spawners generating autonomous or mouse-guided drones (Doritos), square minions, or swarm drones that seek cursor target.",
+      "representativeTanks": [
+        "overseer",
+        "overlord",
+        "necromancer",
+        "manager",
+        "battleship",
+        "factory",
+        "overtrapper"
+      ]
+    },
+    "trapper": {
+      "name": "Trapper & Kinetic Barriers",
+      "description": "Deployers of semi-static triangular kinetic spikes that persist in the arena, block enemy fire, and damage ramming enemies.",
+      "representativeTanks": [
+        "trapper",
+        "tri-trapper",
+        "gunner-trapper",
+        "mega-trapper",
+        "auto-trapper",
+        "overtrapper"
+      ]
+    },
+    "smasher-ram": {
+      "name": "Smasher & Rammer",
+      "description": "Heavily armored or thruster-accelerated hulls designed to eliminate targets through physical collision rather than gunfire.",
+      "representativeTanks": [
+        "smasher",
+        "landmine",
+        "spike",
+        "auto-smasher",
+        "booster",
+        "fighter"
+      ]
+    },
+    "auto-turret": {
+      "name": "Autonomous Turrets",
+      "description": "Tanks equipped with independently targeting 360-degree secondary AI turrets that track and engage targets autonomously.",
+      "representativeTanks": [
+        "auto-3",
+        "auto-5",
+        "auto-gunner",
+        "auto-trapper",
+        "auto-smasher",
+        "auto-tank"
+      ]
+    }
+  },
+  "stats": {
+    "totalSkillPoints": 33,
+    "maxLevel": 45,
+    "statCapDefault": 7,
+    "statCapSmasher": 10,
+    "pointGainSchedule": {
+      "levelRangeContinuous": "Levels 2 to 28 (1 point per level = 27 points)",
+      "levelRangePeriodic": "Levels 30, 33, 36, 39, 42, 45 (1 point every 3 levels = 6 points)",
+      "totalFormula": "27 + 6 = 33 skill points"
+    },
+    "attributes": [
+      {
+        "id": "healthRegen",
+        "name": "Health Regen",
+        "description": "Increases health regeneration rate. Regeneration accelerates exponentially after 30 seconds without taking damage.",
+        "maxPoints": 7,
+        "smasherMaxPoints": 10,
+        "status": "documented"
+      },
+      {
+        "id": "maxHealth",
+        "name": "Max Health",
+        "description": "Increases total maximum hit points of the tank chassis.",
+        "maxPoints": 7,
+        "smasherMaxPoints": 10,
+        "status": "documented"
+      },
+      {
+        "id": "bodyDamage",
+        "name": "Body Damage",
+        "description": "Increases damage dealt upon physical contact with shapes, projectiles, and enemy tanks; acts as damage reduction armor against incoming collisions.",
+        "maxPoints": 7,
+        "smasherMaxPoints": 10,
+        "status": "documented"
+      },
+      {
+        "id": "bulletSpeed",
+        "name": "Bullet Speed",
+        "description": "Increases muzzle velocity and flight travel speed of fired projectiles, drones, and traps.",
+        "maxPoints": 7,
+        "smasherMaxPoints": 0,
+        "status": "documented"
+      },
+      {
+        "id": "bulletPenetration",
+        "name": "Bullet Penetration",
+        "description": "Increases projectile durability / hit points, allowing bullets to survive multiple impacts with shapes or opposing bullets before expiring.",
+        "maxPoints": 7,
+        "smasherMaxPoints": 0,
+        "status": "documented"
+      },
+      {
+        "id": "bulletDamage",
+        "name": "Bullet Damage",
+        "description": "Increases destructive damage applied by each bullet, drone, or trap impact per collision tick.",
+        "maxPoints": 7,
+        "smasherMaxPoints": 0,
+        "status": "documented"
+      },
+      {
+        "id": "reload",
+        "name": "Reload",
+        "description": "Decreases time delay between successive shots; accelerates drone reproduction rate and trap deployment rate.",
+        "maxPoints": 7,
+        "smasherMaxPoints": 0,
+        "status": "documented"
+      },
+      {
+        "id": "movementSpeed",
+        "name": "Movement Speed",
+        "description": "Increases base acceleration and maximum directional velocity across the arena grid.",
+        "maxPoints": 7,
+        "smasherMaxPoints": 10,
+        "status": "documented"
+      }
+    ]
+  },
+  "tanks": [
+    {
+      "id": "tank",
+      "name": "Tank",
+      "tier": 1,
+      "levelRequirement": 1,
+      "upgradesFrom": [],
+      "upgradesTo": [
+        "twin",
+        "sniper",
+        "machine-gun",
+        "flank-guard",
+        "smasher",
+        "auto-tank"
+      ],
+      "weaponFamily": "single-cannon",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "standard-fire"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "twin",
+      "name": "Twin",
+      "tier": 2,
+      "levelRequirement": 15,
+      "upgradesFrom": [
+        "tank"
+      ],
+      "upgradesTo": [
+        "triple-shot",
+        "quad-tank",
+        "twin-flank"
+      ],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 2,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "alternating-fire",
+        "recoil-thrust"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "sniper",
+      "name": "Sniper",
+      "tier": 2,
+      "levelRequirement": 15,
+      "upgradesFrom": [
+        "tank"
+      ],
+      "upgradesTo": [
+        "assassin",
+        "overseer",
+        "hunter",
+        "trapper"
+      ],
+      "weaponFamily": "sniper",
+      "barrelCount": 1,
+      "fovMultiplier": 1.25,
+      "specialMechanics": [
+        "high-velocity-projectile",
+        "slow-reload",
+        "extended-fov"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "machine-gun",
+      "name": "Machine Gun",
+      "tier": 2,
+      "levelRequirement": 15,
+      "upgradesFrom": [
+        "tank"
+      ],
+      "upgradesTo": [
+        "destroyer",
+        "gunner",
+        "shotgun",
+        "sprayer"
+      ],
+      "weaponFamily": "heavy-cannon",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "bullet-spread",
+        "high-fire-rate",
+        "trapezoid-barrel"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "flank-guard",
+      "name": "Flank Guard",
+      "tier": 2,
+      "levelRequirement": 15,
+      "upgradesFrom": [
+        "tank"
+      ],
+      "upgradesTo": [
+        "tri-angle",
+        "quad-tank",
+        "twin-flank",
+        "auto-3"
+      ],
+      "weaponFamily": "flank-thruster",
+      "barrelCount": 2,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "rear-barrel",
+        "independent-recoil"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "triple-shot",
+      "name": "Triple Shot",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "twin"
+      ],
+      "upgradesTo": [
+        "triplet",
+        "penta-shot",
+        "spread-shot"
+      ],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 3,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "spread-triple-fire",
+        "front-arc-coverage"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "quad-tank",
+      "name": "Quad Tank",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "twin",
+        "flank-guard"
+      ],
+      "upgradesTo": [
+        "octo-tank",
+        "auto-5"
+      ],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 4,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "omnidirectional-90-deg",
+        "recoil-cancellation"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "twin-flank",
+      "name": "Twin Flank",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "twin",
+        "flank-guard"
+      ],
+      "upgradesTo": [
+        "triple-twin",
+        "battleship"
+      ],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 4,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "dual-front-and-rear",
+        "recoil-cancellation"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "assassin",
+      "name": "Assassin",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "sniper"
+      ],
+      "upgradesTo": [
+        "ranger",
+        "stalker"
+      ],
+      "weaponFamily": "sniper",
+      "barrelCount": 1,
+      "fovMultiplier": 1.5,
+      "specialMechanics": [
+        "elongated-barrel",
+        "higher-fov",
+        "heavy-damage-per-shot"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "overseer",
+      "name": "Overseer",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "sniper"
+      ],
+      "upgradesTo": [
+        "overlord",
+        "necromancer",
+        "manager",
+        "overtrapper",
+        "battleship",
+        "factory"
+      ],
+      "weaponFamily": "drone-controller",
+      "barrelCount": 2,
+      "fovMultiplier": 1.1,
+      "specialMechanics": [
+        "drone-spawner-doritos",
+        "mouse-guidance",
+        "drone-cap-8"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "hunter",
+      "name": "Hunter",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "sniper"
+      ],
+      "upgradesTo": [
+        "predator",
+        "streamliner"
+      ],
+      "weaponFamily": "sniper",
+      "barrelCount": 2,
+      "fovMultiplier": 1.25,
+      "specialMechanics": [
+        "stacked-concentric-shot",
+        "heavy-and-light-bullet"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "trapper",
+      "name": "Trapper",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "sniper"
+      ],
+      "upgradesTo": [
+        "tri-trapper",
+        "gunner-trapper",
+        "overtrapper",
+        "mega-trapper",
+        "auto-trapper"
+      ],
+      "weaponFamily": "trapper",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "kinetic-trap-launcher",
+        "trap-lifespan-30s",
+        "projectile-blocker"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "destroyer",
+      "name": "Destroyer",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "machine-gun"
+      ],
+      "upgradesTo": [
+        "hybrid",
+        "annihilator",
+        "skimmer",
+        "rocketeer",
+        "glider",
+        "firework"
+      ],
+      "weaponFamily": "heavy-cannon",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "huge-bullet",
+        "extreme-damage",
+        "extreme-recoil-mobility"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "gunner",
+      "name": "Gunner",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "machine-gun"
+      ],
+      "upgradesTo": [
+        "auto-gunner",
+        "gunner-trapper",
+        "streamliner"
+      ],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 4,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "micro-bullets",
+        "rapid-staggered-stream",
+        "high-recoil"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "shotgun",
+      "name": "Shotgun",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "machine-gun"
+      ],
+      "upgradesTo": [
+        "pellet-shot",
+        "dual-barrel"
+      ],
+      "weaponFamily": "shotgun-burst",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "pellet-volley-12",
+        "spread-burst",
+        "rammer-knockback"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "tri-angle",
+      "name": "Tri-Angle",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "flank-guard"
+      ],
+      "upgradesTo": [
+        "booster",
+        "fighter"
+      ],
+      "weaponFamily": "flank-thruster",
+      "barrelCount": 3,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "twin-rear-thrusters",
+        "extreme-forward-acceleration"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "auto-3",
+      "name": "Auto 3",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "flank-guard"
+      ],
+      "upgradesTo": [
+        "auto-5",
+        "auto-gunner"
+      ],
+      "weaponFamily": "auto-turret",
+      "barrelCount": 3,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "three-independent-turrets",
+        "autonomous-targeting-360"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "smasher",
+      "name": "Smasher",
+      "tier": 3,
+      "levelRequirement": 30,
+      "upgradesFrom": [
+        "tank"
+      ],
+      "upgradesTo": [
+        "landmine",
+        "auto-smasher",
+        "spike"
+      ],
+      "weaponFamily": "smasher-ram",
+      "barrelCount": 0,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "no-cannons",
+        "body-ramming-armor",
+        "tier-jump-from-tank",
+        "10-stat-cap"
+      ],
+      "statCapExceptions": {
+        "bulletStatsDisabled": true,
+        "maxStatCap": 10
+      },
+      "status": "documented"
+    },
+    {
+      "id": "triplet",
+      "name": "Triplet",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "triple-shot"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 3,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "concentrated-triple-barrel",
+        "high-linear-dps"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "penta-shot",
+      "name": "Penta Shot",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "triple-shot"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 5,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "fan-arc-fire",
+        "area-denial",
+        "massive-backward-recoil"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "spread-shot",
+      "name": "Spread Shot",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "triple-shot"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 11,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "11-barrel-curved-arc",
+        "large-center-bullet",
+        "micro-flank-bullets"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "octo-tank",
+      "name": "Octo Tank",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "quad-tank"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 8,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "8-directional-radial-fire",
+        "auto-spin-c-synergy"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "auto-5",
+      "name": "Auto 5",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "quad-tank",
+        "auto-3"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "auto-turret",
+      "barrelCount": 5,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "5-independent-autonomous-turrets",
+        "omni-radar-tracking"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "triple-twin",
+      "name": "Triple Twin",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "twin-flank"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 6,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "3-pairs-twin-barrels-120-deg",
+        "radial-bullet-spray"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "battleship",
+      "name": "Battleship",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "twin-flank",
+        "overseer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "drone-controller",
+      "barrelCount": 4,
+      "fovMultiplier": 1.1,
+      "specialMechanics": [
+        "mini-drone-swarm",
+        "hybrid-controllable-and-autonomous-drones"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "ranger",
+      "name": "Ranger",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "assassin"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "sniper",
+      "barrelCount": 1,
+      "fovMultiplier": 1.75,
+      "specialMechanics": [
+        "maximum-game-fov",
+        "extreme-range-sniper"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "stalker",
+      "name": "Stalker",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "assassin"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "sniper",
+      "barrelCount": 1,
+      "fovMultiplier": 1.5,
+      "specialMechanics": [
+        "invisibility-when-stationary",
+        "fade-in-time-2s",
+        "ambush-sniper"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "overlord",
+      "name": "Overlord",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "overseer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "drone-controller",
+      "barrelCount": 4,
+      "fovMultiplier": 1.1,
+      "specialMechanics": [
+        "4-spawners-rapid-reload",
+        "drone-cap-8",
+        "high-burst-drone-damage"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "necromancer",
+      "name": "Necromancer",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "overseer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "drone-controller",
+      "barrelCount": 2,
+      "fovMultiplier": 1.1,
+      "specialMechanics": [
+        "square-conversion-infection",
+        "square-drones",
+        "max-drone-capacity-up-to-42"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "manager",
+      "name": "Manager",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "overseer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "drone-controller",
+      "barrelCount": 1,
+      "fovMultiplier": 1.1,
+      "specialMechanics": [
+        "drone-spawner-cap-8",
+        "invisibility-when-stationary-or-guiding"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "overtrapper",
+      "name": "Overtrapper",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "overseer",
+        "trapper"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "trapper",
+      "barrelCount": 3,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "trap-launcher-front",
+        "2-autonomous-defender-drones-rear"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "factory",
+      "name": "Factory",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "overseer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "drone-controller",
+      "barrelCount": 1,
+      "fovMultiplier": 1.1,
+      "specialMechanics": [
+        "produces-mini-tanks-minions",
+        "minions-shoot-and-thrust",
+        "minion-cap-6"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "predator",
+      "name": "Predator",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "hunter"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "sniper",
+      "barrelCount": 3,
+      "fovMultiplier": 1.35,
+      "specialMechanics": [
+        "three-tiered-bullets",
+        "manual-zoom-lens-right-click"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "streamliner",
+      "name": "Streamliner",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "hunter",
+        "gunner"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "sniper",
+      "barrelCount": 5,
+      "fovMultiplier": 1.35,
+      "specialMechanics": [
+        "5-stacked-barrels",
+        "ultra-concentrated-laser-bullet-stream"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "tri-trapper",
+      "name": "Tri-Trapper",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "trapper"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "trapper",
+      "barrelCount": 3,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "3-trap-barrels-120-deg",
+        "fortress-builder"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "gunner-trapper",
+      "name": "Gunner Trapper",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "trapper",
+        "gunner"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "trapper",
+      "barrelCount": 3,
+      "fovMultiplier": 1.15,
+      "specialMechanics": [
+        "rear-large-trap-launcher",
+        "front-dual-stream-gunner-cannons"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "mega-trapper",
+      "name": "Mega Trapper",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "trapper"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "trapper",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "colossal-traps",
+        "huge-durability-kinetic-barriers"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "auto-trapper",
+      "name": "Auto Trapper",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "trapper"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "trapper",
+      "barrelCount": 2,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "front-trap-launcher",
+        "autonomous-auto-turret-on-top"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "hybrid",
+      "name": "Hybrid",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "destroyer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "heavy-cannon",
+      "barrelCount": 2,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "destroyer-cannon-front",
+        "2-autonomous-chaser-drones-rear"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "annihilator",
+      "name": "Annihilator",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "destroyer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "heavy-cannon",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "largest-bullet-size",
+        "monstrous-recoil-thrust"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "skimmer",
+      "name": "Skimmer",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "destroyer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "heavy-cannon",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "fires-missile-with-rear-dual-thruster-bullets"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "rocketeer",
+      "name": "Rocketeer",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "destroyer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "heavy-cannon",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "fires-penetrating-missile-with-single-propulsion-stream"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "glider",
+      "name": "Glider",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "destroyer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "heavy-cannon",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "gliding-curved-trajectory-heavy-shot"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "firework",
+      "name": "Firework",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "destroyer"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "heavy-cannon",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "detonating-shell-bursting-into-radial-shrapnel"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "auto-gunner",
+      "name": "Auto Gunner",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "gunner",
+        "auto-3"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "twin-spammer",
+      "barrelCount": 5,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "4-gunner-barrels-front",
+        "autonomous-auto-turret-on-top"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "pellet-shot",
+      "name": "Pellet Shot",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "shotgun"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "shotgun-burst",
+      "barrelCount": 3,
+      "fovMultiplier": 1.25,
+      "specialMechanics": [
+        "30-pellet-burst-spread",
+        "sniper-tier-fov-ambush"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "dual-barrel",
+      "name": "Dual-Barrel",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "shotgun"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "shotgun-burst",
+      "barrelCount": 2,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "split-left-right-click-fire",
+        "simultaneous-burst-massive-recoil"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "sprayer",
+      "name": "Sprayer",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "machine-gun"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "heavy-cannon",
+      "barrelCount": 2,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "concentric-machine-gun-and-standard-barrel",
+        "continuous-stream-bullet-hell"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "booster",
+      "name": "Booster",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "tri-angle"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "flank-thruster",
+      "barrelCount": 5,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "4-rear-thrusters",
+        "1-front-barrel",
+        "highest-forward-thrust-in-game"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "fighter",
+      "name": "Fighter",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "tri-angle"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "flank-thruster",
+      "barrelCount": 5,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "2-side-cannons",
+        "2-rear-thrusters",
+        "1-front-cannon",
+        "strafing-dogfight"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    },
+    {
+      "id": "landmine",
+      "name": "Landmine",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "smasher"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "smasher-ram",
+      "barrelCount": 0,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "stealth-invisibility-after-13s",
+        "ramming-armor",
+        "10-stat-cap"
+      ],
+      "statCapExceptions": {
+        "bulletStatsDisabled": true,
+        "maxStatCap": 10
+      },
+      "status": "documented"
+    },
+    {
+      "id": "auto-smasher",
+      "name": "Auto Smasher",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "smasher"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "smasher-ram",
+      "barrelCount": 1,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "autonomous-turret-on-smasher-body",
+        "hybrid-ram-and-peck",
+        "10-stat-cap"
+      ],
+      "statCapExceptions": {
+        "bulletStatsDisabled": false,
+        "maxStatCap": 10
+      },
+      "status": "documented"
+    },
+    {
+      "id": "spike",
+      "name": "Spike",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "smasher"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "smasher-ram",
+      "barrelCount": 0,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "rotating-kinetic-spikes-hull",
+        "reduced-knockback",
+        "bonus-base-body-damage",
+        "10-stat-cap"
+      ],
+      "statCapExceptions": {
+        "bulletStatsDisabled": true,
+        "maxStatCap": 10
+      },
+      "status": "documented"
+    },
+    {
+      "id": "auto-tank",
+      "name": "Auto Tank",
+      "tier": 4,
+      "levelRequirement": 45,
+      "upgradesFrom": [
+        "tank"
+      ],
+      "upgradesTo": [],
+      "weaponFamily": "auto-turret",
+      "barrelCount": 4,
+      "fovMultiplier": 1.0,
+      "specialMechanics": [
+        "tier-jump-from-tank-at-45",
+        "4-autonomous-turrets-360"
+      ],
+      "statCapExceptions": {},
+      "status": "documented"
+    }
+  ],
+  "specialEntities": [
+    {
+      "id": "dominator-destroyer",
+      "name": "Destroyer Dominator",
+      "type": "objective-structure",
+      "tier": "special",
+      "level": 75,
+      "modes": [
+        "domination",
+        "sandbox"
+      ],
+      "mechanics": [
+        "massive-stationary-fortress",
+        "extreme-bullet-size",
+        "team-controllable-with-h-key",
+        "contested-zone-capture"
+      ],
+      "status": "documented"
+    },
+    {
+      "id": "dominator-gunner",
+      "name": "Gunner Dominator",
+      "type": "objective-structure",
+      "tier": "special",
+      "level": 75,
+      "modes": [
+        "domination",
+        "sandbox"
+      ],
+      "mechanics": [
+        "massive-stationary-fortress",
+        "rapid-stream-gunner-bullets",
+        "team-controllable-with-h-key",
+        "contested-zone-capture"
+      ],
+      "status": "documented"
+    },
+    {
+      "id": "dominator-trapper",
+      "name": "Trapper Dominator",
+      "type": "objective-structure",
+      "tier": "special",
+      "level": 75,
+      "modes": [
+        "domination",
+        "sandbox"
+      ],
+      "mechanics": [
+        "massive-stationary-fortress",
+        "giant-radial-traps",
+        "team-controllable-with-h-key",
+        "contested-zone-capture"
+      ],
+      "status": "documented"
+    },
+    {
+      "id": "mothership",
+      "name": "Mothership",
+      "type": "flagship",
+      "tier": "special",
+      "level": 140,
+      "modes": [
+        "mothership",
+        "sandbox"
+      ],
+      "mechanics": [
+        "massive-drone-carrier",
+        "16-drone-cap-oversized",
+        "team-captain-piloting",
+        "health-pool-7000"
+      ],
+      "status": "documented"
+    },
+    {
+      "id": "arena-closer",
+      "name": "Arena Closer",
+      "type": "enforcer",
+      "tier": "special",
+      "level": 100,
+      "modes": [
+        "all-end-game"
+      ],
+      "mechanics": [
+        "invulnerable-damage-immune",
+        "massive-bullet-instakill",
+        "arena-sweep-cleanup"
+      ],
+      "status": "documented"
+    }
+  ],
+  "shapes": [
+    {
+      "id": "square",
+      "name": "Square",
+      "sides": 4,
+      "colorToken": "#FFE869",
+      "baseHealth": 10,
+      "experienceValue": 10,
+      "distribution": "arena-wide-common",
+      "status": "documented"
+    },
+    {
+      "id": "triangle",
+      "name": "Triangle",
+      "sides": 3,
+      "colorToken": "#FC7677",
+      "baseHealth": 30,
+      "experienceValue": 25,
+      "distribution": "arena-wide-uncommon",
+      "status": "documented"
+    },
+    {
+      "id": "pentagon",
+      "name": "Pentagon",
+      "sides": 5,
+      "colorToken": "#768DFC",
+      "baseHealth": 100,
+      "experienceValue": 130,
+      "distribution": "center-nest-dense",
+      "status": "documented"
+    },
+    {
+      "id": "alpha-pentagon",
+      "name": "Alpha Pentagon",
+      "sides": 5,
+      "colorToken": "#768DFC",
+      "baseHealth": 3000,
+      "experienceValue": 3000,
+      "distribution": "center-nest-boss-shape",
+      "status": "documented"
+    },
+    {
+      "id": "crasher",
+      "name": "Crasher",
+      "sides": 3,
+      "colorToken": "#F177DD",
+      "baseHealth": 15,
+      "experienceValue": 15,
+      "distribution": "center-nest-aggressive-swarm-ai",
+      "status": "documented"
+    },
+    {
+      "id": "green-square",
+      "name": "Green Square",
+      "sides": 4,
+      "colorToken": "#89E894",
+      "baseHealth": 1000,
+      "experienceValue": 1000,
+      "distribution": "ultra-rare-easter-egg",
+      "status": "documented"
+    },
+    {
+      "id": "green-triangle",
+      "name": "Green Triangle",
+      "sides": 3,
+      "colorToken": "#89E894",
+      "baseHealth": 3000,
+      "experienceValue": 2500,
+      "distribution": "ultra-rare-easter-egg",
+      "status": "documented"
+    },
+    {
+      "id": "green-pentagon",
+      "name": "Green Pentagon",
+      "sides": 5,
+      "colorToken": "#89E894",
+      "baseHealth": 10000,
+      "experienceValue": 13000,
+      "distribution": "ultra-rare-easter-egg",
+      "status": "documented"
+    }
+  ],
+  "bosses": [
+    {
+      "id": "guardian-of-the-pentagons",
+      "name": "Guardian of the Pentagons",
+      "shape": "giant-triangle",
+      "weaponType": "crashers-swarm-spawner",
+      "spawnCondition": "center-nest-timer",
+      "behavior": "wanders nest, unleashes relentless stream of high-speed crashers",
+      "status": "documented"
+    },
+    {
+      "id": "summoner",
+      "name": "Summoner",
+      "shape": "giant-square",
+      "weaponType": "yellow-drone-spawner",
+      "spawnCondition": "arena-edge-timer",
+      "behavior": "4 drone spawners generating massive waves of square drones with mouse/closest-player tracking",
+      "status": "documented"
+    },
+    {
+      "id": "defender",
+      "name": "Defender",
+      "shape": "giant-triangle",
+      "weaponType": "trap-launcher-and-auto-turrets",
+      "spawnCondition": "arena-edge-timer",
+      "behavior": "lays defensive perimeter of heavy kinetic traps while 3 auto-turrets fire upon players",
+      "status": "documented"
+    },
+    {
+      "id": "fallen-overlord",
+      "name": "Fallen Overlord",
+      "shape": "fallen-tank-overlord",
+      "weaponType": "gray-drone-spawners",
+      "spawnCondition": "arena-edge-timer",
+      "behavior": "aggressive AI player clone, tracks nearest players and swarms them with controllable drones",
+      "status": "documented"
+    },
+    {
+      "id": "fallen-booster",
+      "name": "Fallen Booster",
+      "shape": "fallen-tank-booster",
+      "weaponType": "rammer-ai-with-rear-thrusters",
+      "spawnCondition": "arena-edge-timer",
+      "behavior": "hyper-fast rammer AI, locks onto target player and charges relentlessly with body collision",
+      "status": "documented"
+    }
+  ],
+  "gameModes": [
+    {
+      "id": "ffa",
+      "name": "Free For All (FFA)",
+      "scopeStage": "v1-core",
+      "teams": 1,
+      "teamDamage": true,
+      "description": "Every player fights for themselves. Leaderboard tracks top score in room. Respawn at half level.",
+      "status": "verified-in-dom"
+    },
+    {
+      "id": "sandbox",
+      "name": "Sandbox",
+      "scopeStage": "v1-core",
+      "teams": 1,
+      "teamDamage": true,
+      "description": "Private experimentation arena with admin/debug keys enabled (K: level up, \\: switch tank, O: suicide, ;: godmode).",
+      "status": "verified-in-dom"
+    },
+    {
+      "id": "two-teams",
+      "name": "2 Teams",
+      "scopeStage": "v1-core",
+      "teams": 2,
+      "teamDamage": false,
+      "description": "Blue vs Red. Opposing team bases equipped with safe sanctuary zones and defensive protector drones.",
+      "status": "verified-in-dom"
+    },
+    {
+      "id": "four-teams",
+      "name": "4 Teams",
+      "scopeStage": "v1-core",
+      "teams": 4,
+      "teamDamage": false,
+      "description": "Blue, Red, Green, and Purple battle across four corner sanctuary bases.",
+      "status": "verified-in-dom"
+    },
+    {
+      "id": "maze",
+      "name": "Maze",
+      "scopeStage": "v1-core",
+      "teams": 1,
+      "teamDamage": true,
+      "description": "FFA combat inside a procedural grid of indestructible walls that block vision, tanks, and projectiles.",
+      "status": "verified-in-dom"
+    },
+    {
+      "id": "domination",
+      "name": "Domination",
+      "scopeStage": "v1-objective-post-mvp",
+      "teams": 2,
+      "teamDamage": false,
+      "description": "Capture 4 Dominator super-structures. First team to control all 4 triggers game over and Arena Closers.",
+      "status": "documented"
+    },
+    {
+      "id": "tag",
+      "name": "Tag",
+      "scopeStage": "v1-objective-post-mvp",
+      "teams": 4,
+      "teamDamage": false,
+      "description": "Infection mechanics: eliminated players respawn on their killer's team until one team absorbs all players.",
+      "status": "documented"
+    },
+    {
+      "id": "mothership",
+      "name": "Mothership",
+      "scopeStage": "historical-v2",
+      "teams": 2,
+      "teamDamage": false,
+      "description": "Each team protects a player-piloted Level 140 Mothership. First team to eliminate opposing flagship wins.",
+      "status": "documented-historical"
+    },
+    {
+      "id": "survival",
+      "name": "Survival",
+      "scopeStage": "historical-v2",
+      "teams": 1,
+      "teamDamage": true,
+      "description": "10-player battle royale with steadily closing arena boundary. Last standing player wins.",
+      "status": "documented-historical"
+    }
+  ]
+}
