@@ -4,7 +4,7 @@ import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from '@diep-
 import { loadServerConfig } from '../src/config';
 import { createGameServer } from '../src/server';
 
-/** Mesure locale reproductible du transport JSON, explicitement sur le placeholder. */
+/** Mesure locale reproductible du transport JSON, sur la simulation réelle, joueurs tirant en continu. */
 const durationMs = Number(process.argv[2] ?? 2000);
 if (!Number.isSafeInteger(durationMs) || durationMs < 1000)
   throw new Error('Durée en ms >= 1000 attendue');
@@ -82,6 +82,12 @@ try {
     );
     code = joined.code;
     configuredShapes = joined.config.shapes.targetCount;
+    client.socket.send(
+      JSON.stringify({
+        t: 'input',
+        input: { seq: 1, move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, fire: true, alt: false },
+      }),
+    );
   }
   await delay(150); // tous les tanks sont apparus avant la fenêtre de mesure
   for (const client of clients) {
@@ -96,7 +102,7 @@ try {
   console.log(
     JSON.stringify(
       {
-        simulation: 'placeholder',
+        simulation: 'ffa',
         players: 8,
         elapsedSeconds,
         configuredShapes,
@@ -109,7 +115,7 @@ try {
         perPlayerSnapshotBytesPerSecond: bytes / elapsedSeconds / 8,
         perPlayerSnapshotsPerSecond: snapshots / elapsedSeconds / 8,
         limitation:
-          '8 tanks immobiles, aucune forme ni projectile ; charges utiles JSON hors trames/TCP/TLS/HTTP',
+          '8 joueurs tirant, formes du preset, positions aléatoires ; charges utiles JSON hors trames/TCP/TLS/HTTP',
       },
       null,
       2,

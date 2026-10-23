@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket, type ClientOptions } from 'ws';
-import { createPlaceholderSimulation, type SimulationFactory } from '@diep-fried/sim';
+import {
+  createPlaceholderSimulation,
+  createSimulation,
+  type SimulationFactory,
+} from '@diep-fried/sim';
 import {
   PROTOCOL_VERSION,
   type ClientMessage,
@@ -28,7 +32,7 @@ afterEach(async () => {
 
 async function start(
   overrides: Partial<ServerConfig> = {},
-  factory?: SimulationFactory,
+  factory: SimulationFactory = createPlaceholderSimulation,
 ): Promise<string> {
   server = createGameServer(
     {
@@ -209,6 +213,26 @@ describe('WebSocket', () => {
     const snapshot = await ana.next('snapshot', (message) => message.ackSeq === 9);
     const own = snapshot.entities.find((entity) => entity.id === snapshot.self.entityId);
     expect(own?.angle).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('branche la simulation réelle : mouvement et tirs autoritaires par WebSocket', async () => {
+    const host = await start({}, createSimulation);
+    const client = await TestClient.connect(host);
+    client.send({ t: 'room.create', name: 'Ana', mode: 'ffa', options: {} });
+    await client.next('room.joined');
+    const before = await client.next('snapshot', (m) => m.self.alive);
+    const tank = before.entities.find((e) => e.id === before.self.entityId)!;
+    // Se déplacer vers le centre pour ne pas buter sur un bord de l'arène.
+    const x = tank.x < 1600 ? 1 : -1;
+    client.send({
+      t: 'input',
+      input: { seq: 1, move: { x, y: 0 }, aim: { x, y: 0 }, fire: true, alt: false },
+    });
+    const after = await client.next('snapshot', (m) => m.ackSeq === 1 && m.tick > before.tick + 6);
+    const moved = after.entities.find((e) => e.id === after.self.entityId)!;
+    expect((moved.x - tank.x) * x).toBeGreaterThan(0);
+    expect(after.entities.some((e) => e.kind === 'projectile')).toBe(true);
+    expect(after.entities.some((e) => e.kind === 'shape')).toBe(true);
   });
 
   it('refuse un code de salon inconnu et libère la place en quittant', async () => {
