@@ -1,16 +1,31 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "meta": {
     "title": "diep-fried.io Content Catalog & Completeness Matrix Data",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "generatedDate": "2026-10-23",
-    "description": "Exhaustive documentary catalog of playable classes, special entities, weapon families, upgrade paths, shapes, bosses, stats, and game modes for diep-fried.io.",
+    "description": "Documentary catalog of playable classes, special entities, weapon families, upgrade paths, shapes, bosses, stats, and game modes for diep-fried.io. This file is plain data: it is NOT validated against any formal schema; integrity rules are listed in meta.integrityRules and checked by review scripts/tests to be written.",
     "verificationCategories": {
-      "verified": "Directly observed and measured in browser or client assets",
-      "documented": "Sourced from public dated documentation (Fandom Wiki 2016-2026, DiepInDepth, changelogs)",
-      "estimated": "Game design parameter chosen specifically for diep-fried.io where original math was not publicly verifiable",
-      "unresolved": "Known ambiguous or version-dependent mechanic requiring empirical calibration"
-    }
+      "verified": "Directly observed in the browser client (23 Oct 2026). Only used for the presence of game-mode selectors in the DOM.",
+      "documented": "Reported by public community documentation (Fandom wiki, DiepInDepth, changelogs). Applies to class existence, tier, level and upgrade edges. Numeric parameters on the same entries are NOT individually verified.",
+      "estimated": "Game design parameter chosen by the diep-fried.io project; a proposal to be validated, not a fact about the original game.",
+      "unresolved": "Known ambiguous or version-dependent mechanic requiring clarification or empirical calibration."
+    },
+    "parameterStatusValues": {
+      "to-validate": "Numeric/behavioural parameter (FOV multiplier, barrel count, caps, timers, HP/XP values, colours) copied from community sources or proposed by the research agent; must be validated before being used as a binding requirement."
+    },
+    "integrityRules": [
+      "tank ids and names are unique; exactly 54 tanks with tier counts 1/4/13/36",
+      "every id in upgradesFrom/upgradesTo exists and the relation is symmetric",
+      "parents always have a strictly lower tier and levelRequirement than their children; the graph is acyclic and every tank is reachable from 'tank'",
+      "weaponFamily and secondaryFamilies refer to keys of weaponFamilies; representativeTanks of a family are exactly the tanks whose primary weaponFamily is that key",
+      "tier counts must not be derived from wiki categories, which also list legacy/removed tanks"
+    ],
+    "versionConventions": {
+      "target": "Remake conventions are chosen explicitly where the original game changed over time. When sources disagree, the convention below wins and the older behaviour is recorded as legacy.",
+      "diep-io-changelog": "https://diepio.fandom.com/wiki/Changelog",
+      "dualBarrel": "Coordinator verification (23 Oct 2026): the changelog reports a Dual-Barrel change on 2 Nov 2025 (two cannons fired by left click, staggered). Remake convention: current behaviour (left click / Space fires both barrels, staggered); the legacy right-click convention is NOT implemented in v1. The changelog entry itself was not re-read by the reviewer (HTTP 402 from the wiki)."
+    },
+    "familyNote": "weaponFamilies is a classification chosen for this catalog (design decision), not an official game taxonomy. weaponFamily is the primary family; secondaryFamilies lists additional traits."
   },
   "reconciliation51vs54": {
     "summary": "Resolution of the class count delta between preliminary inventory (51 tanks) and official tier count (54 normal tanks).",
@@ -63,7 +78,7 @@
         "toTier": 4,
         "fromLevel": 15,
         "atLevel": 45,
-        "note": "Upgrades directly from Machine Gun at level 45, skipping Tier 3 (was Tier 3 in July 2016, moved to Tier 4 on July 31, 2016)."
+        "note": "Upgrades directly from Machine Gun at level 45, skipping Tier 3. The 2016 history (Tier 3 then moved to Tier 4 on 31 July 2016) is unresolved: no dated source was re-checked in this review."
       },
       {
         "tankId": "auto-tank",
@@ -73,7 +88,8 @@
         "atLevel": 45,
         "note": "Upgrades directly from basic Tank at level 45, skipping Tier 2 and Tier 3."
       }
-    ]
+    ],
+    "confirmation": "54 normal classes confirmed by the coordinator on https://diepio.fandom.com/wiki/Upgrades (23 Oct 2026), including Shotgun, Pellet Shot and Dual-Barrel. Wiki categories also contain legacy tanks and must not be counted automatically. Multi-parent upgrade edges (quad-tank, auto-5, auto-gunner, streamliner, gunner-trapper, overtrapper, battleship) and the Auto Tank / Sprayer / Smasher level rules are recorded as documented but were not re-verified edge by edge during this review."
   },
   "weaponFamilies": {
     "single-cannon": {
@@ -89,12 +105,14 @@
       "representativeTanks": [
         "twin",
         "triple-shot",
+        "quad-tank",
+        "twin-flank",
         "triplet",
         "penta-shot",
         "spread-shot",
         "octo-tank",
-        "twin-flank",
-        "triple-twin"
+        "triple-twin",
+        "auto-gunner"
       ]
     },
     "sniper": {
@@ -103,9 +121,9 @@
       "representativeTanks": [
         "sniper",
         "assassin",
+        "hunter",
         "ranger",
         "stalker",
-        "hunter",
         "predator",
         "streamliner"
       ]
@@ -114,15 +132,13 @@
       "name": "Heavy Cannon & High Recoil",
       "description": "Large-bore barrels firing high-inertia, high-damage or high-recoil projectiles, used for burst damage, rocket thrusters, or artillery.",
       "representativeTanks": [
-        "machine-gun",
         "destroyer",
         "hybrid",
         "annihilator",
         "skimmer",
         "rocketeer",
         "glider",
-        "firework",
-        "sprayer"
+        "firework"
       ]
     },
     "shotgun-burst": {
@@ -139,12 +155,11 @@
       "description": "Spawners generating autonomous or mouse-guided drones (Doritos), square minions, or swarm drones that seek cursor target.",
       "representativeTanks": [
         "overseer",
+        "battleship",
         "overlord",
         "necromancer",
         "manager",
-        "battleship",
-        "factory",
-        "overtrapper"
+        "factory"
       ]
     },
     "trapper": {
@@ -152,11 +167,11 @@
       "description": "Deployers of semi-static triangular kinetic spikes that persist in the arena, block enemy fire, and damage ramming enemies.",
       "representativeTanks": [
         "trapper",
+        "overtrapper",
         "tri-trapper",
         "gunner-trapper",
         "mega-trapper",
-        "auto-trapper",
-        "overtrapper"
+        "auto-trapper"
       ]
     },
     "smasher-ram": {
@@ -165,10 +180,8 @@
       "representativeTanks": [
         "smasher",
         "landmine",
-        "spike",
         "auto-smasher",
-        "booster",
-        "fighter"
+        "spike"
       ]
     },
     "auto-turret": {
@@ -177,10 +190,26 @@
       "representativeTanks": [
         "auto-3",
         "auto-5",
-        "auto-gunner",
-        "auto-trapper",
-        "auto-smasher",
         "auto-tank"
+      ]
+    },
+    "flank-thruster": {
+      "name": "Flank Guard & Thruster Hulls",
+      "description": "Mixed forward barrels with rear/side cannons or thrusters; mobility from rear-facing fire.",
+      "representativeTanks": [
+        "flank-guard",
+        "tri-angle",
+        "booster",
+        "fighter"
+      ]
+    },
+    "rapid-fire": {
+      "name": "Rapid Fire / Machine Gun",
+      "description": "High fire rate, wide random spread, continuous bullet streams.",
+      "representativeTanks": [
+        "machine-gun",
+        "gunner",
+        "sprayer"
       ]
     }
   },
@@ -259,7 +288,8 @@
         "smasherMaxPoints": 10,
         "status": "documented"
       }
-    ]
+    ],
+    "note": "Point caps and the 33-point schedule are documented; the Stats page itself states some values are approximate. smasherMaxPoints 0 means 'stat disabled' for Smasher, Landmine and Spike only; Auto Smasher keeps bullet stats."
   },
   "tanks": [
     {
@@ -283,7 +313,9 @@
         "standard-fire"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "twin",
@@ -306,7 +338,9 @@
         "recoil-thrust"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "sniper",
@@ -331,7 +365,9 @@
         "extended-fov"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "machine-gun",
@@ -347,7 +383,7 @@
         "shotgun",
         "sprayer"
       ],
-      "weaponFamily": "heavy-cannon",
+      "weaponFamily": "rapid-fire",
       "barrelCount": 1,
       "fovMultiplier": 1.0,
       "specialMechanics": [
@@ -356,7 +392,9 @@
         "trapezoid-barrel"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "flank-guard",
@@ -380,7 +418,9 @@
         "independent-recoil"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "triple-shot",
@@ -403,7 +443,9 @@
         "front-arc-coverage"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "quad-tank",
@@ -426,7 +468,12 @@
         "recoil-cancellation"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Multi-parent upgrade edge recorded from community documentation; re-verify against the Upgrades page."
+      ]
     },
     {
       "id": "twin-flank",
@@ -449,7 +496,9 @@
         "recoil-cancellation"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "assassin",
@@ -472,7 +521,9 @@
         "heavy-damage-per-shot"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "overseer",
@@ -499,7 +550,9 @@
         "drone-cap-8"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "hunter",
@@ -521,7 +574,9 @@
         "heavy-and-light-bullet"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "trapper",
@@ -547,7 +602,9 @@
         "projectile-blocker"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "destroyer",
@@ -574,7 +631,9 @@
         "extreme-recoil-mobility"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "gunner",
@@ -589,7 +648,7 @@
         "gunner-trapper",
         "streamliner"
       ],
-      "weaponFamily": "twin-spammer",
+      "weaponFamily": "rapid-fire",
       "barrelCount": 4,
       "fovMultiplier": 1.0,
       "specialMechanics": [
@@ -598,7 +657,9 @@
         "high-recoil"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "shotgun",
@@ -621,7 +682,12 @@
         "rammer-knockback"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Pellet count (12) and cone angle (30 deg) are not verified and are proposals."
+      ]
     },
     {
       "id": "tri-angle",
@@ -643,7 +709,9 @@
         "extreme-forward-acceleration"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "auto-3",
@@ -665,7 +733,9 @@
         "autonomous-targeting-360"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "smasher",
@@ -693,7 +763,9 @@
         "bulletStatsDisabled": true,
         "maxStatCap": 10
       },
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "triplet",
@@ -712,7 +784,9 @@
         "high-linear-dps"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "penta-shot",
@@ -732,7 +806,9 @@
         "massive-backward-recoil"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "spread-shot",
@@ -752,7 +828,9 @@
         "micro-flank-bullets"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "octo-tank",
@@ -771,7 +849,9 @@
         "auto-spin-c-synergy"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "auto-5",
@@ -791,7 +871,12 @@
         "omni-radar-tracking"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Multi-parent upgrade edge recorded from community documentation; re-verify against the Upgrades page."
+      ]
     },
     {
       "id": "triple-twin",
@@ -810,7 +895,9 @@
         "radial-bullet-spray"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "battleship",
@@ -830,7 +917,12 @@
         "hybrid-controllable-and-autonomous-drones"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Multi-parent upgrade edge recorded from community documentation; re-verify against the Upgrades page."
+      ]
     },
     {
       "id": "ranger",
@@ -849,7 +941,9 @@
         "extreme-range-sniper"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "stalker",
@@ -869,7 +963,12 @@
         "ambush-sniper"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Fade time (2 s) and movement threshold (1 unit) are proposals."
+      ]
     },
     {
       "id": "overlord",
@@ -889,7 +988,9 @@
         "high-burst-drone-damage"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "necromancer",
@@ -909,7 +1010,13 @@
         "max-drone-capacity-up-to-42"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Square conversion trigger is unresolved: contact with a square vs. a square destroyed by the Necromancer or its drones. Original rule not verified.",
+        "The 42-drone ceiling comes from community sources and depends on the Reload stat; unverified."
+      ]
     },
     {
       "id": "manager",
@@ -928,7 +1035,9 @@
         "invisibility-when-stationary-or-guiding"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "overtrapper",
@@ -948,7 +1057,14 @@
         "2-autonomous-defender-drones-rear"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [
+        "drone-controller"
+      ],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Multi-parent upgrade edge recorded from community documentation; re-verify against the Upgrades page."
+      ]
     },
     {
       "id": "factory",
@@ -968,7 +1084,9 @@
         "minion-cap-6"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "predator",
@@ -987,7 +1105,12 @@
         "manual-zoom-lens-right-click"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Right-click/Shift camera offset magnitude (1.5x) is a proposal; original behaviour not verified."
+      ]
     },
     {
       "id": "streamliner",
@@ -1007,7 +1130,12 @@
         "ultra-concentrated-laser-bullet-stream"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Multi-parent upgrade edge recorded from community documentation; re-verify against the Upgrades page."
+      ]
     },
     {
       "id": "tri-trapper",
@@ -1026,7 +1154,9 @@
         "fortress-builder"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "gunner-trapper",
@@ -1046,7 +1176,12 @@
         "front-dual-stream-gunner-cannons"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Multi-parent upgrade edge recorded from community documentation; re-verify against the Upgrades page."
+      ]
     },
     {
       "id": "mega-trapper",
@@ -1065,7 +1200,9 @@
         "huge-durability-kinetic-barriers"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "auto-trapper",
@@ -1084,7 +1221,11 @@
         "autonomous-auto-turret-on-top"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [
+        "auto-turret"
+      ],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "hybrid",
@@ -1103,7 +1244,9 @@
         "2-autonomous-chaser-drones-rear"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "annihilator",
@@ -1122,7 +1265,9 @@
         "monstrous-recoil-thrust"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "skimmer",
@@ -1140,7 +1285,9 @@
         "fires-missile-with-rear-dual-thruster-bullets"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "rocketeer",
@@ -1158,7 +1305,9 @@
         "fires-penetrating-missile-with-single-propulsion-stream"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "glider",
@@ -1176,7 +1325,9 @@
         "gliding-curved-trajectory-heavy-shot"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "firework",
@@ -1194,7 +1345,9 @@
         "detonating-shell-bursting-into-radial-shrapnel"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "auto-gunner",
@@ -1214,7 +1367,14 @@
         "autonomous-auto-turret-on-top"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [
+        "auto-turret"
+      ],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Multi-parent upgrade edge recorded from community documentation; re-verify against the Upgrades page."
+      ]
     },
     {
       "id": "pellet-shot",
@@ -1233,7 +1393,12 @@
         "sniper-tier-fov-ambush"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Pellet count (30) comes from community description; per-pellet radius (3 units) is a proposal."
+      ]
     },
     {
       "id": "dual-barrel",
@@ -1248,11 +1413,22 @@
       "barrelCount": 2,
       "fovMultiplier": 1.0,
       "specialMechanics": [
-        "split-left-right-click-fire",
-        "simultaneous-burst-massive-recoil"
+        "two-barrels-staggered-fire",
+        "left-click-or-space-fires-both",
+        "massive-recoil"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "versionNotes": {
+        "legacy": "Before 2 Nov 2025 (per coordinator verification of the wiki changelog): left click and right click were catalogued as controlling the left/right barrels separately. Superseded.",
+        "current": "From 2 Nov 2025: two cannons fired by left click, staggered.",
+        "remakeConvention": "Current behaviour. Right click has no firing role for Dual-Barrel in v1."
+      },
+      "openQuestions": [
+        "Exact stagger delay and recoil magnitude are not documented; to be chosen at calibration."
+      ]
     },
     {
       "id": "sprayer",
@@ -1263,7 +1439,7 @@
         "machine-gun"
       ],
       "upgradesTo": [],
-      "weaponFamily": "heavy-cannon",
+      "weaponFamily": "rapid-fire",
       "barrelCount": 2,
       "fovMultiplier": 1.0,
       "specialMechanics": [
@@ -1271,7 +1447,12 @@
         "continuous-stream-bullet-hell"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Tier-3-then-Tier-4 history in 2016 unverified."
+      ]
     },
     {
       "id": "booster",
@@ -1291,7 +1472,9 @@
         "highest-forward-thrust-in-game"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "fighter",
@@ -1312,7 +1495,9 @@
         "strafing-dogfight"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "landmine",
@@ -1335,7 +1520,12 @@
         "bulletStatsDisabled": true,
         "maxStatCap": 10
       },
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Invisibility delay (13 s) is not verified."
+      ]
     },
     {
       "id": "auto-smasher",
@@ -1358,7 +1548,14 @@
         "bulletStatsDisabled": false,
         "maxStatCap": 10
       },
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [
+        "auto-turret"
+      ],
+      "parameterStatus": "to-validate",
+      "openQuestions": [
+        "Whether bullet stats keep cap 7 while body stats go to 10 is not documented; assumed."
+      ]
     },
     {
       "id": "spike",
@@ -1382,7 +1579,9 @@
         "bulletStatsDisabled": true,
         "maxStatCap": 10
       },
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     },
     {
       "id": "auto-tank",
@@ -1401,7 +1600,9 @@
         "4-autonomous-turrets-360"
       ],
       "statCapExceptions": {},
-      "status": "documented"
+      "status": "documented",
+      "secondaryFamilies": [],
+      "parameterStatus": "to-validate"
     }
   ],
   "specialEntities": [
@@ -1421,7 +1622,8 @@
         "team-controllable-with-h-key",
         "contested-zone-capture"
       ],
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "dominator-gunner",
@@ -1439,7 +1641,8 @@
         "team-controllable-with-h-key",
         "contested-zone-capture"
       ],
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "dominator-trapper",
@@ -1457,7 +1660,8 @@
         "team-controllable-with-h-key",
         "contested-zone-capture"
       ],
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "mothership",
@@ -1475,7 +1679,8 @@
         "team-captain-piloting",
         "health-pool-7000"
       ],
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "arena-closer",
@@ -1491,7 +1696,8 @@
         "massive-bullet-instakill",
         "arena-sweep-cleanup"
       ],
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     }
   ],
   "shapes": [
@@ -1503,7 +1709,9 @@
       "baseHealth": 10,
       "experienceValue": 10,
       "distribution": "arena-wide-common",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate",
+      "note": "HP/XP values and colours are community figures; docs/research/diep-io-inventaire.md lists XP per shape and level thresholds as constants not to be invented. Treat as calibration starting points."
     },
     {
       "id": "triangle",
@@ -1513,7 +1721,8 @@
       "baseHealth": 30,
       "experienceValue": 25,
       "distribution": "arena-wide-uncommon",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "pentagon",
@@ -1523,7 +1732,8 @@
       "baseHealth": 100,
       "experienceValue": 130,
       "distribution": "center-nest-dense",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "alpha-pentagon",
@@ -1533,7 +1743,8 @@
       "baseHealth": 3000,
       "experienceValue": 3000,
       "distribution": "center-nest-boss-shape",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "crasher",
@@ -1543,7 +1754,8 @@
       "baseHealth": 15,
       "experienceValue": 15,
       "distribution": "center-nest-aggressive-swarm-ai",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "green-square",
@@ -1553,7 +1765,8 @@
       "baseHealth": 1000,
       "experienceValue": 1000,
       "distribution": "ultra-rare-easter-egg",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "green-triangle",
@@ -1563,7 +1776,8 @@
       "baseHealth": 3000,
       "experienceValue": 2500,
       "distribution": "ultra-rare-easter-egg",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "green-pentagon",
@@ -1573,7 +1787,8 @@
       "baseHealth": 10000,
       "experienceValue": 13000,
       "distribution": "ultra-rare-easter-egg",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     }
   ],
   "bosses": [
@@ -1582,45 +1797,50 @@
       "name": "Guardian of the Pentagons",
       "shape": "giant-triangle",
       "weaponType": "crashers-swarm-spawner",
-      "spawnCondition": "center-nest-timer",
+      "spawnCondition": "center-nest-timer (design proposal; original timing not verified)",
       "behavior": "wanders nest, unleashes relentless stream of high-speed crashers",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "summoner",
       "name": "Summoner",
       "shape": "giant-square",
       "weaponType": "yellow-drone-spawner",
-      "spawnCondition": "arena-edge-timer",
+      "spawnCondition": "arena-edge-timer (design proposal; original timing not verified)",
       "behavior": "4 drone spawners generating massive waves of square drones with mouse/closest-player tracking",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "defender",
       "name": "Defender",
       "shape": "giant-triangle",
       "weaponType": "trap-launcher-and-auto-turrets",
-      "spawnCondition": "arena-edge-timer",
+      "spawnCondition": "arena-edge-timer (design proposal; original timing not verified)",
       "behavior": "lays defensive perimeter of heavy kinetic traps while 3 auto-turrets fire upon players",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "fallen-overlord",
       "name": "Fallen Overlord",
       "shape": "fallen-tank-overlord",
       "weaponType": "gray-drone-spawners",
-      "spawnCondition": "arena-edge-timer",
+      "spawnCondition": "arena-edge-timer (design proposal; original timing not verified)",
       "behavior": "aggressive AI player clone, tracks nearest players and swarms them with controllable drones",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     },
     {
       "id": "fallen-booster",
       "name": "Fallen Booster",
       "shape": "fallen-tank-booster",
       "weaponType": "rammer-ai-with-rear-thrusters",
-      "spawnCondition": "arena-edge-timer",
+      "spawnCondition": "arena-edge-timer (design proposal; original timing not verified)",
       "behavior": "hyper-fast rammer AI, locks onto target player and charges relentlessly with body collision",
-      "status": "documented"
+      "status": "documented",
+      "parameterStatus": "to-validate"
     }
   ],
   "gameModes": [
@@ -1630,8 +1850,10 @@
       "scopeStage": "v1-core",
       "teams": 1,
       "teamDamage": true,
-      "description": "Every player fights for themselves. Leaderboard tracks top score in room. Respawn at half level.",
-      "status": "verified-in-dom"
+      "description": "Every player fights for themselves. Leaderboard tracks top score in room. Respawn at max(1, min(22, floor(level/2))) (remake proposal).",
+      "status": "documented",
+      "domSelectorObserved": true,
+      "verificationNote": "Only the presence of a mode selector in the DOM was observed (23 Oct 2026); rules below are documented/estimated."
     },
     {
       "id": "sandbox",
@@ -1640,7 +1862,9 @@
       "teams": 1,
       "teamDamage": true,
       "description": "Private experimentation arena with admin/debug keys enabled (K: level up, \\: switch tank, O: suicide, ;: godmode).",
-      "status": "verified-in-dom"
+      "status": "documented",
+      "domSelectorObserved": true,
+      "verificationNote": "Only the presence of a mode selector in the DOM was observed (23 Oct 2026); rules below are documented/estimated."
     },
     {
       "id": "two-teams",
@@ -1649,7 +1873,9 @@
       "teams": 2,
       "teamDamage": false,
       "description": "Blue vs Red. Opposing team bases equipped with safe sanctuary zones and defensive protector drones.",
-      "status": "verified-in-dom"
+      "status": "documented",
+      "domSelectorObserved": true,
+      "verificationNote": "Only the presence of a mode selector in the DOM was observed (23 Oct 2026); rules below are documented/estimated."
     },
     {
       "id": "four-teams",
@@ -1658,7 +1884,9 @@
       "teams": 4,
       "teamDamage": false,
       "description": "Blue, Red, Green, and Purple battle across four corner sanctuary bases.",
-      "status": "verified-in-dom"
+      "status": "documented",
+      "domSelectorObserved": true,
+      "verificationNote": "Only the presence of a mode selector in the DOM was observed (23 Oct 2026); rules below are documented/estimated."
     },
     {
       "id": "maze",
@@ -1666,13 +1894,15 @@
       "scopeStage": "v1-core",
       "teams": 1,
       "teamDamage": true,
-      "description": "FFA combat inside a procedural grid of indestructible walls that block vision, tanks, and projectiles.",
-      "status": "verified-in-dom"
+      "description": "FFA combat inside a procedural grid of indestructible walls that block vision, tanks, projectiles and drones.",
+      "status": "documented",
+      "domSelectorObserved": true,
+      "verificationNote": "Only the presence of a mode selector in the DOM was observed (23 Oct 2026); rules below are documented/estimated."
     },
     {
       "id": "domination",
       "name": "Domination",
-      "scopeStage": "v1-objective-post-mvp",
+      "scopeStage": "post-mvp-v1.5",
       "teams": 2,
       "teamDamage": false,
       "description": "Capture 4 Dominator super-structures. First team to control all 4 triggers game over and Arena Closers.",
@@ -1681,11 +1911,15 @@
     {
       "id": "tag",
       "name": "Tag",
-      "scopeStage": "v1-objective-post-mvp",
-      "teams": 4,
+      "scopeStage": "post-mvp-v1.5",
+      "teams": 2,
       "teamDamage": false,
       "description": "Infection mechanics: eliminated players respawn on their killer's team until one team absorbs all players.",
-      "status": "documented"
+      "status": "documented",
+      "teamOptions": [
+        2,
+        4
+      ]
     },
     {
       "id": "mothership",
@@ -1703,7 +1937,29 @@
       "teams": 1,
       "teamDamage": true,
       "description": "10-player battle royale with steadily closing arena boundary. Last standing player wins.",
-      "status": "documented-historical"
+      "status": "documented-historical",
+      "aliases": [
+        "Battle Royale"
+      ],
+      "aliasNote": "The DOM selector is labelled 'Battle Royale'; mapping to the historical Survival mode is an assumption."
+    },
+    {
+      "id": "capture-the-flag",
+      "name": "Capture the Flag",
+      "scopeStage": "backlog-uncertain-documentation",
+      "teams": 2,
+      "teamDamage": false,
+      "description": "Objective mode reported by community documentation and by indexed site text. Rules, rotation and version availability are unknown; kept in backlog, not forgotten.",
+      "status": "unresolved"
+    },
+    {
+      "id": "breakout",
+      "name": "Breakout",
+      "scopeStage": "backlog-uncertain-documentation",
+      "teams": null,
+      "teamDamage": null,
+      "description": "Objective mode listed by community documentation. Rules and current availability are unknown; kept in backlog, not forgotten.",
+      "status": "unresolved"
     }
   ]
 }
