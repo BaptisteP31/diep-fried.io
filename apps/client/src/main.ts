@@ -12,6 +12,7 @@ import { ControlsModal } from './ui/controls-modal';
 import { DeathScreen } from './ui/death-screen';
 import { GameHud } from './ui/hud';
 import { Menu } from './ui/menu';
+import { UpgradeTreeModal } from './ui/upgrade-tree-modal';
 
 /** Intervalle maximal sans envoi d'intention, même si rien ne change. */
 const INPUT_KEEPALIVE_MS = 250;
@@ -41,6 +42,13 @@ const controlsModal = new ControlsModal({
     input.setBindings(newBindings);
   },
   onVisibilityChanged: () => syncInputAvailability(),
+});
+
+// Modal de l'arbre d'évolution des 54 classes
+const upgradeTreeModal = new UpgradeTreeModal({
+  onChooseClass: (classId) => {
+    sendCommand({ type: 'chooseClass', classId });
+  },
 });
 
 // Écran de mort avec décompte de réapparition
@@ -83,6 +91,9 @@ const hud = new GameHud({
     hud.setToggles(input.isAutoFire, input.isAutoSpin);
   },
   onOpenControls: () => controlsModal.show(),
+  onOpenUpgradeTree: () => {
+    upgradeTreeModal.toggle();
+  },
 });
 
 // Contrôleur d'entrées clavier et souris
@@ -92,6 +103,9 @@ const input = new InputController(canvas, {
   },
   onToggle: (_action, _enabled) => {
     hud.setToggles(input.isAutoFire, input.isAutoSpin);
+  },
+  onUpgradeTree: (open) => {
+    upgradeTreeModal.setHeld(open);
   },
   bindings: loadBindings(),
 });
@@ -141,6 +155,7 @@ function resetRoom(): void {
   renderer.reset();
   hud.reset();
   deathScreen.hide();
+  upgradeTreeModal.hide();
   minimapContainer.hidden = true;
 }
 
