@@ -8,41 +8,61 @@ function element<T extends HTMLElement>(id: string): T {
 
 export interface MenuActions {
   create(name: string, mode: ModeId): void;
-  join(name: string, code: string): void;
-  respawn(): void;
+  join(name: string, code: string, resumeToken?: string): void;
+  onOpenControls(): void;
 }
 
-/** Interface DOM superposée au canvas : accueil, bandeau de salon, écran de mort. */
+/** Interface DOM superposée au canvas : accueil, reprise de session, commandes. */
 export class Menu {
   private readonly form = element<HTMLFormElement>('menu');
   private readonly name = element<HTMLInputElement>('menu-name');
   private readonly mode = element<HTMLSelectElement>('menu-mode');
   private readonly code = element<HTMLInputElement>('menu-code');
   private readonly status = element<HTMLParagraphElement>('menu-status');
-  private readonly hud = element<HTMLDivElement>('hud');
-  private readonly hudRoom = element<HTMLSpanElement>('hud-room');
-  private readonly hudStatus = element<HTMLSpanElement>('hud-status');
-  private readonly death = element<HTMLDivElement>('death');
-  private readonly deathText = element<HTMLParagraphElement>('death-text');
+  private readonly resumeContainer = element<HTMLDivElement>('menu-resume-container');
+  private readonly resumeBtn = element<HTMLButtonElement>('menu-resume-btn');
+  private readonly controlsBtn = element<HTMLButtonElement>('menu-controls-btn');
 
-  constructor(actions: MenuActions) {
+  constructor(private readonly actions: MenuActions) {
     this.name.value = localStorage.getItem('diep-fried:name') ?? '';
     this.code.value = new URLSearchParams(location.search).get('room') ?? '';
-    const name = () => {
-      localStorage.setItem('diep-fried:name', this.name.value);
-      return this.name.value;
+
+    const getName = () => {
+      const val = this.name.value.trim();
+      localStorage.setItem('diep-fried:name', val);
+      return val;
     };
+
     element('menu-create').addEventListener('click', () => {
-      if (isModeId(this.mode.value)) actions.create(name(), this.mode.value);
+      if (isModeId(this.mode.value)) actions.create(getName(), this.mode.value);
     });
+
     this.form.addEventListener('submit', (event) => {
       event.preventDefault();
-      actions.join(name(), normalizeRoomCode(this.code.value));
+      const roomCode = normalizeRoomCode(this.code.value);
+      const savedToken = roomCode
+        ? (localStorage.getItem(`diep-fried:resume:${roomCode}`) ?? undefined)
+        : undefined;
+      actions.join(getName(), roomCode, savedToken);
     });
-    element('hud-copy').addEventListener('click', () => {
+
+    element('hud-copy')?.addEventListener('click', () => {
       void navigator.clipboard?.writeText(location.href);
     });
-    element('death-respawn').addEventListener('click', () => actions.respawn());
+
+    this.resumeBtn.addEventListener('click', () => {
+      const lastRoom = localStorage.getItem('diep-fried:lastRoom');
+      if (!lastRoom) return;
+      const token = localStorage.getItem(`diep-fried:resume:${lastRoom}`) ?? undefined;
+      this.code.value = lastRoom;
+      actions.join(getName(), lastRoom, token);
+    });
+
+    this.controlsBtn.addEventListener('click', () => {
+      actions.onOpenControls();
+    });
+
+    this.checkResumeAvailability();
   }
 
   setStatus(text: string): void {
@@ -51,8 +71,7 @@ export class Menu {
 
   showLobby(): void {
     this.form.hidden = false;
-    this.hud.hidden = true;
-    this.death.hidden = true;
+    this.checkResumeAvailability();
   }
 
   showRoom(code: string): void {
@@ -60,16 +79,44 @@ export class Menu {
     url.searchParams.set('room', code);
     history.replaceState(null, '', url);
     this.form.hidden = true;
-    this.hud.hidden = false;
-    this.hudRoom.textContent = `Salon ${code}`;
   }
 
-  setHudStatus(text: string): void {
-    this.hudStatus.textContent = text;
+  checkResumeAvailability(): void {
+    const lastRoom = localStorage.getItem('diep-fried:lastRoom');
+    const token = lastRoom ? localStorage.getItem(`diep-fried:resume:${lastRoom}`) : null;
+    if (lastRoom && token) {
+      this.resumeContainer.hidden = false;
+      this.resumeBtn.textContent = `Reprendre la partie précédente (Salon ${lastRoom})`;
+    } else {
+      this.resumeContainer.hidden = true;
+    }
   }
 
-  showDeath(text: string | null): void {
-    this.death.hidden = text === null;
-    this.deathText.textContent = text ?? '';
+  saveSession(code: string, resumeToken: string): void {
+    try {
+      localStorage.setItem('diep-fried:lastRoom', code);
+      localStorage.setItem(`diep-fried:resume:${code}`, resumeToken);
+      this.checkResumeAvailability();
+    } catch (err) {
+      console.warn('[menu] impossible de sauvegarder la session :', err);
+    }
+  }
+
+  clearSession(code?: string): void {
+    try {
+      if (code) {
+        localStorage.removeItem(`diep-fried:resume:${code}`);
+        if (localStorage.getItem('diep-fried:lastRoom') === code) {
+          localStorage.removeItem('diep-fried:lastRoom');
+        }
+      } else {
+        const lastRoom = localStorage.getItem('diep-fried:lastRoom');
+        if (lastRoom) localStorage.removeItem(`diep-fried:resume:${lastRoom}`);
+        localStorage.removeItem('diep-fried:lastRoom');
+      }
+      this.checkResumeAvailability();
+    } catch {
+      // ignorer
+    }
   }
 }

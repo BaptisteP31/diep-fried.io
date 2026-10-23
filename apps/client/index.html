@@ -6,15 +6,83 @@
     <title>diep-fried.io</title>
   </head>
   <body>
+    <!-- Canvas de jeu principal -->
     <canvas id="game"></canvas>
+
+    <!-- Bandeau HUD haut-gauche -->
     <div id="hud" hidden>
       <span id="hud-room"></span>
-      <button id="hud-copy" type="button">Copier le lien</button>
+      <button id="hud-copy" type="button" title="Copier le lien d'invitation">
+        Copier le lien
+      </button>
+      <span id="hud-ping">Ping : --</span>
       <span id="hud-status"></span>
+      <button
+        id="hud-autofire"
+        class="hud-toggle-badge"
+        type="button"
+        title="Activer / désactiver le tir automatique (Touche E)"
+      >
+        [E] Tir auto
+      </button>
+      <button
+        id="hud-autospin"
+        class="hud-toggle-badge"
+        type="button"
+        title="Activer / désactiver la rotation automatique (Touche C)"
+      >
+        [C] Rotation auto
+      </button>
+      <button id="hud-controls-btn" type="button" title="Configurer les touches">Touches</button>
     </div>
+
+    <!-- Évolutions / Choix de classe (haut gauche sous le bandeau) -->
+    <div id="class-choices" hidden>
+      <div class="class-choices-header">Évolutions disponibles</div>
+      <div id="class-choices-list"></div>
+    </div>
+
+    <!-- Classement des joueurs (haut droite) -->
+    <div id="leaderboard" hidden>
+      <div class="leaderboard-header">Classement</div>
+      <div id="leaderboard-list"></div>
+    </div>
+
+    <!-- Panneau des 8 statistiques (bas gauche) -->
+    <div id="stats-panel" hidden>
+      <div id="stats-points" class="stats-points-badge"></div>
+    </div>
+
+    <!-- Niveau / Score / Barre d'XP (bas centre) -->
+    <div id="bottom-hud" hidden>
+      <div id="hud-player-name"></div>
+      <div id="hud-score">Score : 0</div>
+      <div id="hud-xp-bar">
+        <div id="hud-xp-fill"></div>
+        <span id="hud-level-text">Niveau 1</span>
+      </div>
+    </div>
+
+    <!-- Minicarte (bas droite) -->
+    <div id="minimap-container" hidden>
+      <canvas id="minimap" width="130" height="130"></canvas>
+    </div>
+
+    <!-- Menu d'accueil / Salon -->
     <form id="menu" autocomplete="off">
       <h1>diep-fried.io</h1>
-      <label>Pseudonyme <input id="menu-name" maxlength="16" placeholder="Sans nom" /></label>
+
+      <div id="menu-resume-container" hidden>
+        <button id="menu-resume-btn" type="button" class="btn-highlight">
+          Reprendre la partie précédente
+        </button>
+      </div>
+
+      <label>
+        Pseudonyme
+        <input id="menu-name" maxlength="16" placeholder="Sans nom" />
+      </label>
+
       <fieldset>
         <legend>Nouveau salon</legend>
         <select id="menu-mode">
@@ -23,18 +91,47 @@
         </select>
         <button id="menu-create" type="button">Créer</button>
       </fieldset>
+
       <fieldset>
         <legend>Rejoindre</legend>
         <input id="menu-code" maxlength="6" placeholder="CODE" spellcheck="false" />
         <button id="menu-join" type="submit">Rejoindre</button>
       </fieldset>
+
+      <button id="menu-controls-btn" type="button" class="btn-secondary">
+        Configuration des commandes
+      </button>
+
       <p id="menu-status" role="status"></p>
       <a href="/licenses/THIRD_PARTY_NOTICES.txt" target="_blank">Licences</a>
     </form>
+
+    <!-- Écran de mort -->
     <div id="death" hidden>
-      <p id="death-text"></p>
-      <button id="death-respawn" type="button">Réapparaître</button>
+      <h2>Détruit</h2>
+      <p id="death-killer"></p>
+      <p id="death-stats"></p>
+      <button id="death-respawn" type="button">Réapparaître (Entrée)</button>
     </div>
+
+    <!-- Modal de configuration des commandes -->
+    <div id="controls-modal" hidden>
+      <div class="controls-content">
+        <h2>Commandes du clavier</h2>
+        <p class="controls-subtitle">
+          Disposition par défaut adaptée aux claviers physiques AZERTY (ZQSD). Cliquez sur une
+          touche pour la modifier.
+        </p>
+        <div id="controls-list"></div>
+        <div class="controls-actions">
+          <button id="controls-reset" type="button" class="btn-secondary">
+            Réinitialiser (AZERTY)
+          </button>
+          <button id="controls-close" type="button">Fermer</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

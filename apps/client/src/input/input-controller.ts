@@ -1,9 +1,21 @@
 import type { PlayerInput, StatId, Vec2 } from '@diep-fried/shared';
-import { DEFAULT_BINDINGS, moveIntent, type HeldAction, type KeyBindings } from './bindings';
+import {
+  DEFAULT_BINDINGS,
+  loadBindings,
+  moveIntent,
+  type HeldAction,
+  type KeyBindings,
+} from './bindings';
 
 /** Vitesse de rotation de la visée automatique, en radians par seconde (choix d'ergonomie). */
 const AUTO_SPIN_SPEED = Math.PI / 2;
 const AUTO_SPIN_RADIUS = 300;
+
+export interface InputControllerOptions {
+  onStat?: (stat: StatId) => void;
+  onToggle?: (action: 'autoFire' | 'autoSpin', enabled: boolean) => void;
+  bindings?: KeyBindings;
+}
 
 /**
  * Collecte clavier et souris et produit des intentions `PlayerInput` séquencées.
@@ -16,12 +28,26 @@ export class InputController {
   private autoSpin = false;
   private spinAngle = 0;
   private seq = 0;
+  private bindings: KeyBindings;
+  private readonly onStat: (stat: StatId) => void;
+  private readonly onToggle:
+    ((action: 'autoFire' | 'autoSpin', enabled: boolean) => void) | undefined;
 
   constructor(
     target: HTMLElement,
-    private readonly onStat: (stat: StatId) => void,
-    private readonly bindings: KeyBindings = DEFAULT_BINDINGS,
+    onStatOrOptions: ((stat: StatId) => void) | InputControllerOptions,
+    bindingsArg?: KeyBindings,
   ) {
+    if (typeof onStatOrOptions === 'function') {
+      this.onStat = onStatOrOptions;
+      this.onToggle = undefined;
+      this.bindings = bindingsArg ?? loadBindings();
+    } else {
+      this.onStat = onStatOrOptions.onStat ?? (() => {});
+      this.onToggle = onStatOrOptions.onToggle;
+      this.bindings = onStatOrOptions.bindings ?? bindingsArg ?? loadBindings();
+    }
+
     window.addEventListener('keydown', (event) => this.onKey(event, true));
     window.addEventListener('keyup', (event) => this.onKey(event, false));
     window.addEventListener('blur', () => this.held.clear());
@@ -32,6 +58,34 @@ export class InputController {
     target.addEventListener('mousedown', (event) => this.onButton(event.button, true));
     window.addEventListener('mouseup', (event) => this.onButton(event.button, false));
     target.addEventListener('contextmenu', (event) => event.preventDefault());
+  }
+
+  setBindings(newBindings: KeyBindings): void {
+    this.bindings = { ...newBindings };
+  }
+
+  getBindings(): KeyBindings {
+    return { ...this.bindings };
+  }
+
+  get isAutoFire(): boolean {
+    return this.autoFire;
+  }
+
+  get isAutoSpin(): boolean {
+    return this.autoSpin;
+  }
+
+  toggleAutoFire(): boolean {
+    this.autoFire = !this.autoFire;
+    this.onToggle?.('autoFire', this.autoFire);
+    return this.autoFire;
+  }
+
+  toggleAutoSpin(): boolean {
+    this.autoSpin = !this.autoSpin;
+    this.onToggle?.('autoSpin', this.autoSpin);
+    return this.autoSpin;
   }
 
   /**
@@ -60,7 +114,13 @@ export class InputController {
   }
 
   private onKey(event: KeyboardEvent, down: boolean): void {
-    if (event.target instanceof HTMLInputElement) return;
+    if (
+      event.target instanceof HTMLInputElement ||
+      event.target instanceof HTMLTextAreaElement ||
+      event.target instanceof HTMLSelectElement
+    ) {
+      return;
+    }
     const action = this.bindings[event.code];
     if (!action) return;
     event.preventDefault();
@@ -70,9 +130,13 @@ export class InputController {
       return;
     }
     if (!down || event.repeat) return;
-    if (action.kind === 'stat') this.onStat(action.stat);
-    else if (action.action === 'autoFire') this.autoFire = !this.autoFire;
-    else if (action.action === 'autoSpin') this.autoSpin = !this.autoSpin;
+    if (action.kind === 'stat') {
+      this.onStat(action.stat);
+    } else if (action.action === 'autoFire') {
+      this.toggleAutoFire();
+    } else if (action.action === 'autoSpin') {
+      this.toggleAutoSpin();
+    }
     // `upgradeTree` : réservé à l'interface de l'arbre d'évolution.
   }
 
