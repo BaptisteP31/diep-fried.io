@@ -6,6 +6,9 @@ import {
   type ClientMessage,
   type ServerMessage,
 } from '@diep-fried/shared';
+import { installDom, type Element } from './helpers/dom';
+
+let el: (id: string) => Element;
 
 const ui = vi.hoisted(() => ({
   menu: null as any,
@@ -33,7 +36,8 @@ vi.mock('../src/ui/menu', () => ({
     }
   },
 }));
-vi.mock('../src/ui/hud', () => ({
+vi.mock('../src/ui/hud', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/ui/hud')>()),
   GameHud: class {
     reset = vi.fn();
     show = vi.fn();
@@ -61,6 +65,9 @@ vi.mock('../src/ui/death-screen', () => ({
 vi.mock('../src/ui/controls-modal', () => ({
   ControlsModal: class {
     isVisible = false;
+    hide = vi.fn(() => {
+      this.isVisible = false;
+    });
     constructor() {
       ui.controls = this;
     }
@@ -68,16 +75,19 @@ vi.mock('../src/ui/controls-modal', () => ({
 }));
 vi.mock('../src/input/input-controller', () => ({
   InputController: class {
+    options: any;
     reset = vi.fn();
     setEnabled = vi.fn();
     acknowledgeSequence = vi.fn();
-    constructor() {
+    constructor(_target: unknown, options: any) {
+      this.options = options;
       ui.input = this;
     }
   },
 }));
 vi.mock('../src/render/renderer', () => ({
   Renderer: class {
+    setDisplaySettings = vi.fn();
     reset = vi.fn();
     resize = vi.fn();
     draw = vi.fn();
@@ -127,13 +137,7 @@ beforeEach(async () => {
   vi.useFakeTimers();
   Socket.all = [];
   vi.stubGlobal('WebSocket', Socket);
-  vi.stubGlobal('window', new EventTarget());
-  const minimapContainer = { hidden: true };
-  vi.stubGlobal('document', {
-    getElementById: (id: string) =>
-      id === 'minimap-container' ? minimapContainer : { getContext: () => null },
-  });
-  vi.stubGlobal('location', { host: 'test', protocol: 'http:' });
+  ({ el } = installDom());
   vi.stubGlobal('localStorage', { getItem: () => null });
   vi.stubGlobal('requestAnimationFrame', vi.fn());
   await import('../src/main');
@@ -143,19 +147,52 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function enter() {
-  ui.menu.actions.create('Alice', 'ffa');
+function enter(mode: 'ffa' | 'sandbox' = 'ffa') {
+  ui.menu.actions.create('Alice', mode, { maxPlayers: 8, arenaSize: 'small' });
   const socket = Socket.all[0]!;
   socket.open();
   socket.receive(welcome);
-  socket.receive(joined());
+  socket.receive({ ...joined(), config: resolveModeConfig(mode) } as ServerMessage);
   return socket;
 }
 
 describe('intégration du cycle client', () => {
+  it('envoie les options du créateur par le vrai contrat GameConnection', () => {
+    const socket = enter();
+    expect(socket.sent[1]).toEqual({
+      t: 'room.create',
+      name: 'Alice',
+      mode: 'ffa',
+      options: { maxPlayers: 8, arenaSize: 'small' },
+    });
+  });
+
+  it('quitter invalide la reprise même si l’accusé est perdu, bloque les actions puis permet une nouvelle entrée', () => {
+    const socket = enter();
+    el('hud-leave').dispatchEvent(new Event('click'));
+    expect(socket.sent.at(-1)).toEqual({ t: 'room.leave' });
+    expect(ui.menu.clearSession).toHaveBeenCalledWith('ABCDEF');
+    expect(ui.menu.showLobby).toHaveBeenCalled();
+    ui.input.options.onSandbox('levelUp');
+    ui.menu.actions.create('Bob', 'ffa', {});
+    expect(socket.sent.filter((message) => message.t === 'room.create')).toHaveLength(1);
+    socket.receive({ t: 'room.left', reason: 'requested' });
+    ui.menu.actions.create('Bob', 'ffa', {});
+    expect(socket.sent.at(-1)).toEqual({ t: 'room.create', name: 'Bob', mode: 'ffa', options: {} });
+  });
+
+  it('garde la raison du départ si la connexion se ferme avant l’accusé', () => {
+    const socket = enter();
+    el('hud-leave').dispatchEvent(new Event('click'));
+    socket.close();
+    expect(ui.menu.status).toContain('Vous avez quitté');
+    expect(ui.menu.clearSession).toHaveBeenCalledWith('ABCDEF');
+  });
   it('les boutons du menu reconnectent réellement après fermeture et attendent welcome', () => {
     const socket = enter();
+    ui.controls.isVisible = true;
     socket.close();
+    expect(ui.controls.hide).toHaveBeenCalled();
     expect(ui.menu.showLobby).toHaveBeenCalled();
     expect(ui.menu.status).toContain('Déconnecté');
     expect(ui.renderer.reset).toHaveBeenCalled();

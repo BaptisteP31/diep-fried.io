@@ -7,7 +7,7 @@
   </head>
   <body>
     <!-- Canvas de jeu principal -->
-    <canvas id="game"></canvas>
+    <canvas id="game" tabindex="0" aria-label="Arène de jeu, commandes clavier et souris"></canvas>
 
     <!-- Bandeau HUD haut-gauche -->
     <div id="hud" hidden>
@@ -42,7 +42,16 @@
         [Y] Évolutions
       </button>
       <button id="hud-controls-btn" type="button" title="Configurer les touches">Touches</button>
+      <button id="hud-leave" type="button">Quitter le salon</button>
     </div>
+
+    <section id="sandbox-panel" aria-label="Commandes du bac à sable" hidden>
+      <p>
+        Bac à sable · effets validés par le serveur. Maintenir le raccourci de niveau pour répéter
+        (8/s max). Touches physiques configurables dans les réglages. Chaque activation bascule
+        l’invulnérabilité.
+      </p>
+    </section>
 
     <!-- Évolutions / Choix de classe (haut gauche sous le bandeau) -->
     <div id="class-choices" hidden>
@@ -77,7 +86,7 @@
     </div>
 
     <!-- Menu d'accueil / Salon -->
-    <form id="menu" autocomplete="off">
+    <form id="menu" autocomplete="off" novalidate>
       <h1>diep-fried.io</h1>
 
       <div id="menu-resume-container" hidden>
@@ -91,18 +100,56 @@
         <input id="menu-name" maxlength="16" placeholder="Sans nom" />
       </label>
 
-      <fieldset>
+      <fieldset class="room-options">
         <legend>Nouveau salon</legend>
-        <select id="menu-mode">
-          <option value="ffa">FFA</option>
-          <option value="sandbox">Sandbox</option>
-        </select>
+        <label
+          >Mode
+          <select id="menu-mode" aria-describedby="menu-mode-rules"></select
+        ></label>
+        <p id="menu-mode-rules"></p>
+        <div class="room-option-fields">
+          <label
+            >Joueurs max.
+            <input
+              id="menu-max-players"
+              type="number"
+              min="1"
+              max="32"
+              step="1"
+              placeholder="Selon le mode"
+            />
+          </label>
+          <label
+            >Taille d’arène
+            <select id="menu-arena-size">
+              <option value="">Selon le mode</option>
+              <option value="small">Petite (3 000)</option>
+              <option value="medium">Moyenne (5 000)</option>
+              <option value="large">Grande (8 000)</option>
+            </select>
+          </label>
+          <label
+            >Densité des formes
+            <select id="menu-shape-density">
+              <option value="">Selon le mode</option>
+              <option value="low">Faible</option>
+              <option value="normal">Normale</option>
+              <option value="high">Élevée</option>
+            </select>
+          </label>
+        </div>
         <button id="menu-create" type="button">Créer</button>
       </fieldset>
 
       <fieldset>
         <legend>Rejoindre</legend>
-        <input id="menu-code" maxlength="6" placeholder="CODE" spellcheck="false" />
+        <input
+          id="menu-code"
+          maxlength="6"
+          placeholder="CODE"
+          spellcheck="false"
+          aria-label="Code du salon"
+        />
         <button id="menu-join" type="submit">Rejoindre</button>
         <button id="menu-join-new" type="button" class="btn-secondary">
           Nouvelle entrée (sans reprise)
@@ -110,7 +157,7 @@
       </fieldset>
 
       <button id="menu-controls-btn" type="button" class="btn-secondary">
-        Configuration des commandes
+        Commandes et affichage
       </button>
 
       <p id="menu-status" role="status"></p>
@@ -142,10 +189,23 @@
       hidden
     >
       <div class="controls-content">
-        <h2 id="controls-title">Commandes du clavier</h2>
+        <h2 id="controls-title">Commandes et affichage</h2>
+        <fieldset class="display-settings">
+          <legend>Affichage local</legend>
+          <label><input id="settings-grid" type="checkbox" /> Afficher la grille</label>
+          <label
+            >Qualité (densité de pixels maximale)
+            <select id="settings-quality">
+              <option value="1">Économique · 1×</option>
+              <option value="1.5">Équilibrée · 1,5×</option>
+              <option value="2">Haute · 2×</option>
+            </select>
+          </label>
+        </fieldset>
         <p class="controls-subtitle">
           Disposition par défaut adaptée aux claviers physiques AZERTY (ZQSD). Cliquez sur une
-          touche pour la modifier.
+          touche pour la modifier. Jeu au clavier et à la souris ; les commandes tactiles ne sont
+          pas encore disponibles.
         </p>
         <div id="controls-list"></div>
         <div class="controls-actions">

@@ -8,6 +8,7 @@ import {
   type KeyBindings,
 } from '../input/bindings';
 import { STAT_IDS } from '@diep-fried/shared';
+import { SANDBOX_ACTIONS } from '../input/sandbox';
 
 export interface ControlsModalCallbacks {
   onBindingsChanged(bindings: KeyBindings): void;
@@ -75,8 +76,12 @@ export class ControlsModal {
 
     if (e.key === 'Tab') {
       e.preventDefault();
-      const buttons = [...this.modal.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
-      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const buttons = [
+        ...this.modal.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled)',
+        ),
+      ];
+      const index = buttons.indexOf(document.activeElement as HTMLElement);
       const next = (index + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length;
       buttons[next]?.focus();
       return;
@@ -139,6 +144,11 @@ export class ControlsModal {
         label: ACTION_DESCRIPTIONS.autoSpin ?? 'Rotation auto',
         action: { kind: 'toggle', action: 'autoSpin' },
       },
+      { label: 'Arbre d’évolution', action: { kind: 'toggle', action: 'upgradeTree' } },
+      ...SANDBOX_ACTIONS.map(({ action, label }) => ({
+        label: `Bac à sable : ${label}`,
+        action: { kind: 'sandbox', action } as KeyAction,
+      })),
       ...STAT_IDS.map((stat) => ({
         label: ACTION_DESCRIPTIONS[stat] ?? stat,
         action: { kind: 'stat', stat } as KeyAction,
@@ -188,5 +198,6 @@ function actionsEqual(a: KeyAction, b: KeyAction): boolean {
   if (a.kind === 'held' && b.kind === 'held') return a.action === b.action;
   if (a.kind === 'toggle' && b.kind === 'toggle') return a.action === b.action;
   if (a.kind === 'stat' && b.kind === 'stat') return a.stat === b.stat;
+  if (a.kind === 'sandbox' && b.kind === 'sandbox') return a.action === b.action;
   return false;
 }
