@@ -8,7 +8,7 @@ Lecture seule du runtime : aucun changement de `world.ts`, des modèles, du clie
 
 - Findings 3 et 4 : corrigés par le lot rendu `bd986eb`, postérieur à la base auditée (caméra Predator et angles des tourelles consommés par le renderer).
 - Finding 2 : le coordinateur ajoute le dessin de la carte résolue (murs et frontières de base), avec test dédié ; minimap inchangée.
-- Findings 1 et 5 : corrections simulation déléguées avec régressions demandées ; pas encore intégrées. Le client évite déjà les fantômes de disparition des classes furtives ennemies.
+- Findings 1 et 5 : corrections intégrées depuis `e68f75b`, avec 11 tests dédiés : minions hors base vulnérables et positions ennemies totalement camouflées omises des snapshots. Le client évite déjà les fantômes de disparition des classes furtives ennemies.
 
 ## Baseline et méthode
 
