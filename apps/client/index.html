@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>diep-fried.io</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="hud" hidden>
+      <span id="hud-room"></span>
+      <button id="hud-copy" type="button">Copier le lien</button>
+      <span id="hud-status"></span>
+    </div>
+    <form id="menu" autocomplete="off">
+      <h1>diep-fried.io</h1>
+      <label>Pseudonyme <input id="menu-name" maxlength="16" placeholder="Sans nom" /></label>
+      <fieldset>
+        <legend>Nouveau salon</legend>
+        <select id="menu-mode">
+          <option value="ffa">FFA</option>
+          <option value="sandbox">Sandbox</option>
+        </select>
+        <button id="menu-create" type="button">Créer</button>
+      </fieldset>
+      <fieldset>
+        <legend>Rejoindre</legend>
+        <input id="menu-code" maxlength="6" placeholder="CODE" spellcheck="false" />
+        <button id="menu-join" type="submit">Rejoindre</button>
+      </fieldset>
+      <p id="menu-status" role="status"></p>
+      <a href="/licenses/THIRD_PARTY_NOTICES.txt" target="_blank">Licences</a>
+    </form>
+    <div id="death" hidden>
+      <p id="death-text"></p>
+      <button id="death-respawn" type="button">Réapparaître</button>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

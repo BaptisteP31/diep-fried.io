@@ -1,0 +1,19 @@
+{
+  "name": "@diep-fried/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Client navigateur : menus, entrées, interpolation et rendu Canvas 2D.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@diep-fried/shared": "0.0.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  }
+}

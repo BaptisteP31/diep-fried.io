@@ -16,6 +16,17 @@ Objectif : jeu autonome open source et auto-hébergeable inspiré du gameplay cl
 
 Les références locales `docs/research/asset-collection/reference-only/` sont ignorées par Git. Seuls les assets dont la redistribution est établie sont intégrés à la production, avec leurs licences.
 
+## Démarrage
+
+Node ≥ 22.12 et npm sont requis.
+
+```bash
+npm ci          # installation à partir du lockfile
+npm run dev     # serveur :8080 et client :5173 (http://localhost:5173)
+npm run check   # typecheck, tests et format
+npm run build && npm start   # version auto-hébergée sur :8080
+```
+
 ## État
 
-Initialisation : recherches et ressources libres collectées. Architecture et spécification à produire avant délégation des composants dépendants.
+Jalon 1 : socle TypeScript, contrats partagés, serveur de salons et client Canvas minimal avec une simulation provisoire. Architecture, API et critères du jalon 2 : [architecture.md](architecture.md).

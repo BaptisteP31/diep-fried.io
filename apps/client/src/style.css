@@ -1,0 +1,105 @@
+@font-face {
+  font-family: 'Ubuntu';
+  font-style: normal;
+  font-weight: 700;
+  src: url('../../../assets/fonts/Ubuntu-Bold.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Ubuntu';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../../../assets/fonts/Ubuntu-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+:root {
+  --text-stroke: #393939;
+  font-family: Ubuntu, sans-serif;
+  font-weight: 700;
+  color: #fff;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #cccccc;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+#menu,
+#death {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 0.75rem;
+  min-width: 18rem;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 0.5rem;
+  text-shadow:
+    0.09em 0 0 var(--text-stroke),
+    -0.09em 0 0 var(--text-stroke),
+    0 0.09em 0 var(--text-stroke),
+    0 -0.09em 0 var(--text-stroke);
+}
+
+#menu h1 {
+  margin: 0;
+  text-align: center;
+}
+
+#menu fieldset {
+  display: flex;
+  gap: 0.5rem;
+  border: 0;
+  padding: 0;
+}
+
+#menu legend {
+  margin-bottom: 0.25rem;
+}
+
+#menu a {
+  color: #ddd;
+  font-weight: 400;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  padding: 0.35rem 0.6rem;
+  border: 2px solid #555;
+  border-radius: 0.3rem;
+}
+
+button {
+  cursor: pointer;
+  background: #00b2e1;
+  color: #fff;
+}
+
+#hud {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+[hidden] {
+  display: none !important;
+}

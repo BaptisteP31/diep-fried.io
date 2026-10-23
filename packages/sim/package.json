@@ -1,0 +1,16 @@
+{
+  "name": "@diep-fried/sim",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Simulation autoritaire déterministe, sans dépendance au DOM, à Node ni au transport.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@diep-fried/shared": "0.0.0"
+  }
+}
