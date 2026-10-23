@@ -1,0 +1,13 @@
+{
+  "name": "@diep-fried/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Contrats partagés : modèle d'état, protocole réseau versionné et définitions de contenu.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
