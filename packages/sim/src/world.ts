@@ -6,12 +6,14 @@ import {
   emptyStatLevels,
   getClassDefinition,
   isStatId,
+  type BarrelDefinition,
   type ClassDefinition,
   type ClassId,
   type EntityState,
   type PlayerCommand,
   type PlayerId,
   type PlayerInput,
+  type ProjectileFamily,
   type ProjectileState,
   type ShapeState,
   type SnapshotPayload,
@@ -38,10 +40,11 @@ interface Motion {
 interface Tank extends TankState, Motion {
   playerId: PlayerId;
   nextShots: number[];
-  triggering: boolean;
+  activeBarrels: boolean[];
+  idleSince: number;
   protectedUntil: number;
 }
-interface Bullet extends ProjectileState, Motion {
+interface Projectile extends ProjectileState, Motion {
   health: number;
   maxHealth: number;
   damage: number;
@@ -49,6 +52,12 @@ interface Bullet extends ProjectileState, Motion {
   ownerName: string;
   expires: number;
   hits: Set<number>;
+  nextHits: Map<number, number>;
+  autonomous: boolean;
+  cruiseSpeed: number;
+  secondaryActive: boolean;
+  nextSecondary: number;
+  missile: BarrelDefinition['missile'];
 }
 interface Shape extends ShapeState, Motion {
   reward: number;
@@ -56,7 +65,7 @@ interface Shape extends ShapeState, Motion {
   /** Vitesse de dérive propre ; l'excédent reçu d'une poussée s'amortit. */
   drift: number;
 }
-type Body = Tank | Bullet | Shape;
+type Body = Tank | Projectile | Shape;
 interface Player {
   name: string;
   team: number;
@@ -88,6 +97,7 @@ class World implements Simulation {
   private readonly rng: Rng;
   private readonly players = new Map<PlayerId, Player>();
   private readonly bodies = new Map<number, Body>();
+  private readonly projectileCounts = new Map<number, Record<ProjectileFamily, number>>();
   private commands: { playerId: PlayerId; command: PlayerCommand }[] = [];
   private events: SimEvent[] = [];
 
@@ -156,11 +166,10 @@ class World implements Simulation {
 
   removePlayer(playerId: PlayerId): void {
     const player = this.players.get(playerId);
-    if (player?.tank) this.bodies.delete(player.tank.id);
+    if (player?.tank) this.removeBody(player.tank);
     this.players.delete(playerId);
     for (const body of this.bodies.values()) {
-      if (body.kind === 'projectile' && body.ownerPlayerId === playerId)
-        this.bodies.delete(body.id);
+      if (body.kind === 'projectile' && body.ownerPlayerId === playerId) this.removeBody(body);
     }
     this.commands = this.commands.filter((entry) => entry.playerId !== playerId);
   }
@@ -178,7 +187,10 @@ class World implements Simulation {
 
   private maxHealth(player: Player): number {
     return (
-      B.health + (player.level - 1) * B.healthPerLevel + player.stats.maxHealth * B.healthPerStat
+      (B.health +
+        (player.level - 1) * B.healthPerLevel +
+        player.stats.maxHealth * B.healthPerStat) *
+      (this.definition(player).bodyHealth ?? 1)
     );
   }
 
@@ -243,7 +255,9 @@ class World implements Simulation {
       opacity: 1,
       barrelShots: definition.barrels.map(() => -1),
       nextShots: definition.barrels.map(() => 0),
-      triggering: false,
+      activeBarrels: definition.barrels.map(() => false),
+      idleSince: this.tick,
+      barrelAngles: definition.barrels.map((b) => b.angle),
       protectedUntil: this.tick + Math.ceil(B.spawnProtection * this.config.tickRate),
       spawnProtected: true,
       lastDamageTick: this.tick,
@@ -304,7 +318,18 @@ class World implements Simulation {
         tank.nextShots = this.definition(player).barrels.map(
           () => this.tick / this.config.tickRate,
         );
-        tank.triggering = false;
+        tank.activeBarrels = this.definition(player).barrels.map(() => false);
+        tank.barrelAngles = this.definition(player).barrels.map((b) => tank.angle + b.angle);
+        tank.idleSince = this.tick;
+        tank.opacity = 1;
+        // Les statistiques devenues interdites sont remboursées, sans perdre les autres points.
+        const caps = this.caps(player);
+        for (const stat of STAT_IDS) {
+          const refund = Math.max(0, player.stats[stat] - caps[stat]);
+          player.stats[stat] -= refund;
+          player.spent -= refund;
+        }
+        this.cleanupControlled(tank.id);
         this.syncTank(player);
       }
     }
@@ -320,9 +345,10 @@ class World implements Simulation {
     this.applyCommands();
     const dt = 1 / this.config.tickRate;
     for (const player of this.players.values()) this.prepareTank(player, dt);
+    this.prepareProjectiles(dt);
     const decay = Math.exp(-B.friction * dt);
     for (const body of this.bodies.values()) {
-      if (body.kind === 'projectile' && body.expires <= this.tick) this.bodies.delete(body.id);
+      if (body.kind === 'projectile' && body.expires <= this.tick) this.expireProjectile(body);
       else if (body.kind === 'shape') {
         // Sans frottement, une forme poussée garderait indéfiniment la vitesse d'un tank.
         const speed = Math.hypot(body.vx, body.vy);
@@ -378,62 +404,391 @@ class World implements Simulation {
       tank.vy = 0;
     }
     const now = this.tick / this.config.tickRate;
-    if (input?.fire) {
+    if (input?.fire || input?.alt) {
       tank.spawnProtected = false;
       tank.protectedUntil = this.tick;
-      definition.barrels.forEach((barrel, index) => {
-        if (barrel.projectile !== 'bullet') return;
-        const period = B.reload * barrel.reload * B.reloadPerStat ** player.stats.reload;
-        if (!tank.triggering)
-          tank.nextShots[index] = Math.max(tank.nextShots[index]!, now + barrel.delay * period);
-        if (now + 1e-9 < tank.nextShots[index]!) return;
-        // Échéancier fractionnaire : la cadence moyenne suit la période exacte au lieu d'être
-        // arrondie au tick, au plus un tir par tick. Pas de rattrapage après relâchement.
-        tank.nextShots[index] = Math.max(tank.nextShots[index]! + period, now);
-        tank.barrelShots[index] = this.tick;
-        const angle = tank.angle + barrel.angle;
-        const shotAngle = angle + this.rng.range(-barrel.spread, barrel.spread);
-        const speed =
-          B.bulletSpeed * (1 + B.bulletSpeedPerStat * player.stats.bulletSpeed) * barrel.speed;
-        const x =
-          tank.x +
-          tank.radius * (Math.cos(angle) * barrel.length - Math.sin(angle) * barrel.offset);
-        const y =
-          tank.y +
-          tank.radius * (Math.sin(angle) * barrel.length + Math.cos(angle) * barrel.offset);
-        const health =
-          (B.bulletHealth + B.bulletHealthPerStat * player.stats.bulletPenetration) *
-          barrel.penetration;
-        const bullet: Bullet = {
-          kind: 'projectile',
-          family: 'bullet',
-          id: this.nextId++,
-          team: tank.team,
-          ownerId: tank.id,
-          ownerPlayerId: tank.playerId,
-          ownerName: tank.name,
-          x,
-          y,
-          prevX: x,
-          prevY: y,
-          vx: Math.cos(shotAngle) * speed,
-          vy: Math.sin(shotAngle) * speed,
-          angle: shotAngle,
-          radius: B.bulletRadius * Math.sqrt(barrel.width / 0.84),
-          health,
-          maxHealth: health,
-          damage:
-            (B.bulletDamage + B.bulletDamagePerStat * player.stats.bulletDamage) * barrel.damage,
-          expires: this.tick + Math.ceil(B.bulletLifetime * this.config.tickRate),
-          hits: new Set(),
-          lastDamageTick: this.tick,
-        };
-        if (!this.outside(bullet)) this.bodies.set(bullet.id, bullet);
-        tank.vx -= Math.cos(angle) * B.recoil * barrel.recoil;
-        tank.vy -= Math.sin(angle) * B.recoil * barrel.recoil;
-      });
-      tank.triggering = true;
-    } else tank.triggering = false;
+    }
+    let manualShot = false;
+    definition.barrels.forEach((barrel, index) => {
+      const controlled = barrel.projectile === 'drone' || barrel.projectile === 'minion';
+      const target = barrel.auto ? this.nearestTarget(tank, B.autoRange) : undefined;
+      const active =
+        !barrel.conversionOnly &&
+        (barrel.auto ? target !== undefined : controlled || !!input?.fire);
+      const angle = target
+        ? Math.atan2(target.y - tank.y, target.x - tank.x)
+        : tank.angle + barrel.angle;
+      tank.barrelAngles![index] = angle;
+      const period = B.reload * barrel.reload * B.reloadPerStat ** player.stats.reload;
+      if (
+        this.shotDue(tank.nextShots, tank.activeBarrels, index, active, barrel.delay, period, now)
+      ) {
+        if (this.launch(tank, player, barrel, angle)) {
+          tank.barrelShots[index] = this.tick;
+          if (!controlled) {
+            tank.spawnProtected = false;
+            tank.protectedUntil = this.tick;
+            if (!barrel.auto) manualShot = true;
+          }
+        }
+      }
+    });
+    if (definition.stealth) {
+      if (
+        Math.hypot(tank.vx, tank.vy) > 0.5 ||
+        move.x ||
+        move.y ||
+        manualShot ||
+        tank.lastDamageTick === this.tick - 1
+      )
+        tank.idleSince = this.tick;
+      const idle = (this.tick - tank.idleSince) / this.config.tickRate;
+      tank.opacity = Math.max(
+        0,
+        Math.min(1, 1 - (idle - definition.stealth.delay) / definition.stealth.fade),
+      );
+    }
+    if (definition.altCameraDistance !== undefined) {
+      const distance = input?.alt ? definition.altCameraDistance : 0;
+      tank.cameraOffset = {
+        x: Math.cos(tank.angle) * distance,
+        y: Math.sin(tank.angle) * distance,
+      };
+    }
+  }
+
+  /** Échéances en secondes, indépendantes du tick : même alternance que les armes simples. */
+  private shotDue(
+    next: number[],
+    active: boolean[],
+    index: number,
+    firing: boolean,
+    delay: number,
+    period: number,
+    now: number,
+  ): boolean {
+    if (!firing) {
+      active[index] = false;
+      return false;
+    }
+    if (!active[index]) next[index] = Math.max(next[index] ?? now, now + delay * period);
+    active[index] = true;
+    if (now + 1e-9 < next[index]!) return false;
+    next[index] = Math.max(next[index]! + period, now);
+    return true;
+  }
+
+  private droneLimit(player: Player): number {
+    const def = this.definition(player);
+    return (def.droneLimit ?? 0) + (def.dronesPerReload ?? 0) * player.stats.reload;
+  }
+
+  private controlled(body: Projectile): boolean {
+    return body.family === 'drone' || body.family === 'minion';
+  }
+
+  private removeBody(body: Body): void {
+    if (!this.bodies.delete(body.id) || body.kind !== 'projectile') return;
+    const counts = this.projectileCounts.get(body.ownerPlayerId)!;
+    counts[body.family]--;
+    if (Object.values(counts).every((count) => count === 0))
+      this.projectileCounts.delete(body.ownerPlayerId);
+  }
+
+  private cleanupControlled(ownerId: number): void {
+    for (const body of this.bodies.values())
+      if (body.kind === 'projectile' && body.ownerId === ownerId && this.controlled(body))
+        this.removeBody(body);
+  }
+
+  private canLaunch(ownerPlayerId: PlayerId, family: ProjectileFamily, player: Player): boolean {
+    const counts = this.projectileCounts.get(ownerPlayerId);
+    if (!counts) return true;
+    if (Object.values(counts).reduce((a, b) => a + b, 0) >= B.projectilesPerOwner) return false;
+    if (family === 'drone' || family === 'minion')
+      return counts.drone + counts.minion < this.droneLimit(player);
+    return (
+      counts[family] <
+      (family === 'trap'
+        ? B.trapsPerOwner
+        : family === 'missile'
+          ? B.missilesPerOwner
+          : B.projectilesPerOwner)
+    );
+  }
+
+  private addProjectile(body: Projectile): void {
+    let counts = this.projectileCounts.get(body.ownerPlayerId);
+    if (!counts) {
+      counts = { bullet: 0, drone: 0, minion: 0, trap: 0, missile: 0 };
+      this.projectileCounts.set(body.ownerPlayerId, counts);
+    }
+    counts[body.family]++;
+    this.bodies.set(body.id, body);
+  }
+
+  private launch(
+    source: Tank | Projectile,
+    player: Player,
+    barrel: BarrelDefinition,
+    angle: number,
+  ): boolean {
+    const ownerId = source.kind === 'tank' ? source.id : source.ownerId;
+    const ownerPlayerId = source.kind === 'tank' ? source.playerId : source.ownerPlayerId;
+    let fired = false;
+    for (let pellet = 0; pellet < (barrel.pellets ?? 1); pellet++) {
+      if (!this.canLaunch(ownerPlayerId, barrel.projectile, player)) break;
+      const shotAngle = angle + this.rng.range(-barrel.spread, barrel.spread);
+      const speed =
+        B.bulletSpeed * (1 + B.bulletSpeedPerStat * player.stats.bulletSpeed) * barrel.speed;
+      const x =
+        source.x +
+        source.radius * (Math.cos(angle) * barrel.length - Math.sin(angle) * barrel.offset);
+      const y =
+        source.y +
+        source.radius * (Math.sin(angle) * barrel.length + Math.cos(angle) * barrel.offset);
+      const health =
+        (B.bulletHealth + B.bulletHealthPerStat * player.stats.bulletPenetration) *
+        barrel.penetration;
+      const persistent = barrel.projectile === 'drone' || barrel.projectile === 'minion';
+      const body: Projectile = {
+        kind: 'projectile',
+        family: barrel.projectile,
+        id: this.nextId++,
+        team: source.team,
+        ownerId,
+        ownerPlayerId,
+        ownerName: source.kind === 'tank' ? source.name : source.ownerName,
+        x,
+        y,
+        prevX: x,
+        prevY: y,
+        vx: Math.cos(shotAngle) * speed,
+        vy: Math.sin(shotAngle) * speed,
+        angle: shotAngle,
+        radius: barrel.radius ?? B.bulletRadius * Math.sqrt(barrel.width / 0.84),
+        health,
+        maxHealth: health,
+        damage:
+          (B.bulletDamage + B.bulletDamagePerStat * player.stats.bulletDamage) * barrel.damage,
+        expires:
+          this.tick +
+          Math.ceil(
+            (barrel.lifetime ?? (persistent ? B.droneLifetime : B.bulletLifetime)) *
+              this.config.tickRate,
+          ),
+        hits: new Set(),
+        nextHits: new Map(),
+        lastDamageTick: this.tick,
+        secondaryActive: false,
+        autonomous: barrel.autonomous ?? false,
+        cruiseSpeed: speed,
+        missile: barrel.missile,
+        nextSecondary: this.tick / this.config.tickRate + B.secondaryReload,
+        ...(barrel.projectile !== 'bullet'
+          ? {
+              bodyShape:
+                barrel.projectile === 'drone' || barrel.projectile === 'trap'
+                  ? ('triangle' as const)
+                  : barrel.projectile === 'minion'
+                    ? ('square' as const)
+                    : ('circle' as const),
+              classId:
+                source.kind === 'projectile' ? (source.classId ?? player.classId) : player.classId,
+            }
+          : {}),
+        ...(barrel.projectile === 'missile' || barrel.projectile === 'minion'
+          ? { barrelShots: [-1, -1] }
+          : {}),
+      };
+      if (persistent) this.bound(body);
+      if (!this.outside(body)) {
+        this.addProjectile(body);
+        fired = true;
+      }
+    }
+    if (fired) {
+      source.vx -= Math.cos(angle) * B.recoil * barrel.recoil;
+      source.vy -= Math.sin(angle) * B.recoil * barrel.recoil;
+    }
+    return fired;
+  }
+
+  private nearestTarget(source: Tank | Projectile, range: number): Tank | Shape | undefined {
+    let best: Tank | Shape | undefined;
+    let distance = range * range;
+    for (const body of this.bodies.values()) {
+      if (body.kind === 'projectile' || !this.canDamage(source, body)) continue;
+      if (body.kind === 'tank' && body.opacity < 0.15) continue;
+      const d = (body.x - source.x) ** 2 + (body.y - source.y) ** 2;
+      if (d < distance || (d === distance && body.id < (best?.id ?? Infinity))) {
+        best = body;
+        distance = d;
+      }
+    }
+    return best;
+  }
+
+  private prepareProjectiles(dt: number): void {
+    // Copie : les tirs secondaires créés ici ne peuvent pas se reproduire dans le même tick.
+    for (const body of [...this.bodies.values()]) {
+      if (body.kind !== 'projectile' || body.expires <= this.tick) continue;
+      for (const [id, deadline] of body.nextHits)
+        if (deadline <= this.tick) body.nextHits.delete(id);
+      const player = this.players.get(body.ownerPlayerId);
+      if (!player) {
+        this.removeBody(body);
+        continue;
+      }
+      if (this.controlled(body)) {
+        const owner = player.tank;
+        if (!owner || owner.id !== body.ownerId) {
+          this.removeBody(body);
+          continue;
+        }
+        const input = player.input;
+        const target = this.nearestTarget(body, B.autoRange);
+        const orbit = body.id * 2.399963229728653;
+        let x = owner.x + Math.cos(orbit) * B.droneOrbit;
+        let y = owner.y + Math.sin(orbit) * B.droneOrbit;
+        if (!body.autonomous && (input?.fire || input?.alt)) {
+          x = owner.x + input.aim.x;
+          y = owner.y + input.aim.y;
+          if (input.alt) {
+            const dx = body.x === x && body.y === y ? Math.cos(orbit) : body.x - x;
+            const dy = body.x === x && body.y === y ? Math.sin(orbit) : body.y - y;
+            const length = Math.hypot(dx, dy) || 1;
+            x = body.x + (dx / length) * B.droneLeash;
+            y = body.y + (dy / length) * B.droneLeash;
+          }
+        } else if (target) {
+          x = target.x;
+          y = target.y;
+        }
+        // La portée de contrôle est bornée, même si aim vient d'un appelant sans codec.
+        const dxOwner = x - owner.x;
+        const dyOwner = y - owner.y;
+        const leash = Math.max(1, Math.hypot(dxOwner, dyOwner) / B.droneLeash);
+        x = owner.x + dxOwner / leash;
+        y = owner.y + dyOwner / leash;
+        const dx = x - body.x;
+        const dy = y - body.y;
+        const distance = Math.hypot(dx, dy);
+        const speed = Math.min(body.cruiseSpeed, distance * B.droneSteering);
+        const decay = Math.exp(-B.droneSteering * dt);
+        body.vx = body.vx * decay + (dx / (distance || 1)) * speed * (1 - decay);
+        body.vy = body.vy * decay + (dy / (distance || 1)) * speed * (1 - decay);
+        if (distance > 1) body.angle = Math.atan2(dy, dx);
+        if (body.family === 'minion') {
+          const firing = target ?? (input?.fire && !input.alt ? { x, y } : undefined);
+          if (firing) {
+            body.angle = Math.atan2(firing.y - body.y, firing.x - body.x);
+            this.secondary(body, player, body.angle, [0]);
+          } else body.secondaryActive = false;
+        }
+      } else if (body.family === 'trap') {
+        const decay = Math.exp(-B.trapFriction * dt);
+        body.vx *= decay;
+        body.vy *= decay;
+      } else if (body.family === 'missile') {
+        if (body.missile === 'glider') {
+          body.angle += B.gliderTurn * dt;
+          body.vx = Math.cos(body.angle) * body.cruiseSpeed;
+          body.vy = Math.sin(body.angle) * body.cruiseSpeed;
+        } else if (body.missile === 'rocketeer') {
+          const speed = Math.min(
+            body.cruiseSpeed * 2.5,
+            Math.hypot(body.vx, body.vy) + B.missileAcceleration * dt,
+          );
+          body.vx = Math.cos(body.angle) * speed;
+          body.vy = Math.sin(body.angle) * speed;
+        }
+        if (body.missile !== 'firework')
+          this.secondary(
+            body,
+            player,
+            body.angle,
+            body.missile === 'skimmer' ? [Math.PI - 0.55, Math.PI + 0.55] : [Math.PI],
+          );
+      }
+    }
+  }
+
+  private secondary(body: Projectile, player: Player, angle: number, offsets: number[]): void {
+    const now = this.tick / this.config.tickRate;
+    if (!body.secondaryActive) body.nextSecondary = Math.max(now, body.nextSecondary);
+    body.secondaryActive = true;
+    if (now + 1e-9 < body.nextSecondary) return;
+    body.nextSecondary = Math.max(
+      now,
+      body.nextSecondary + B.secondaryReload * B.reloadPerStat ** player.stats.reload,
+    );
+    offsets.forEach((offset, index) => {
+      if (this.launch(body, player, B.secondaryBarrel, angle + offset))
+        body.barrelShots![index] = this.tick;
+    });
+  }
+
+  private expireProjectile(body: Projectile): void {
+    this.removeBody(body);
+    if (body.missile !== 'firework') return;
+    const player = this.players.get(body.ownerPlayerId);
+    if (!player) return;
+    for (let i = 0; i < B.fireworkFragments; i++)
+      this.launch(body, player, B.fragmentBarrel, (i * Math.PI * 2) / B.fireworkFragments);
+  }
+
+  /** Conversion atomique : un carré donne exactement un drone et une récompense. */
+  private convertSquare(source: Tank | Projectile, target: Body): boolean {
+    if (target.kind !== 'shape' || target.shape !== 'square' || !this.canDamage(source, target))
+      return false;
+    const playerId = source.kind === 'tank' ? source.playerId : source.ownerPlayerId;
+    const player = this.players.get(playerId);
+    if (!player?.tank || player.classId !== 'necromancer') return false;
+    const owner = player.tank;
+    if (source.kind === 'projectile' && (source.ownerId !== owner.id || source.family !== 'drone'))
+      return false;
+    if (!this.canLaunch(playerId, 'drone', player)) return false;
+    this.removeBody(target);
+    const barrel = this.definition(player).barrels[0]!;
+    const health =
+      (B.bulletHealth + B.bulletHealthPerStat * player.stats.bulletPenetration) *
+      barrel.penetration;
+    const body: Projectile = {
+      kind: 'projectile',
+      family: 'drone',
+      id: this.nextId++,
+      ownerId: owner.id,
+      ownerPlayerId: playerId,
+      ownerName: player.name,
+      team: owner.team,
+      x: target.x,
+      y: target.y,
+      prevX: target.x,
+      prevY: target.y,
+      vx: target.vx,
+      vy: target.vy,
+      angle: target.angle,
+      radius: target.radius,
+      health,
+      maxHealth: health,
+      damage: (B.bulletDamage + B.bulletDamagePerStat * player.stats.bulletDamage) * barrel.damage,
+      expires: this.tick + Math.ceil(B.droneLifetime * this.config.tickRate),
+      hits: new Set(),
+      nextHits: new Map(),
+      lastDamageTick: this.tick,
+      secondaryActive: false,
+      autonomous: false,
+      cruiseSpeed:
+        B.bulletSpeed * barrel.speed * (1 + B.bulletSpeedPerStat * player.stats.bulletSpeed),
+      missile: undefined,
+      nextSecondary: Infinity,
+      bodyShape: 'square',
+      classId: 'necromancer',
+    };
+    this.addProjectile(body);
+    this.reward(playerId, target.reward);
+    return true;
   }
 
   private integrate(dt: number): void {
@@ -447,7 +802,11 @@ class World implements Simulation {
       if (body.kind !== 'projectile') this.bound(body);
     }
     const contacts: { a: Body; b: Body; time: number }[] = [];
-    for (const [a, b] of collisionCandidates(bodies, B.gridSize)) {
+    for (const [a, b] of collisionCandidates(
+      bodies,
+      B.gridSize,
+      (a, b) => (a.kind !== 'projectile' && b.kind !== 'projectile') || this.canDamage(a, b),
+    )) {
       const time = contactTime(a, b);
       if (time !== null) contacts.push({ a, b, time });
     }
@@ -455,9 +814,14 @@ class World implements Simulation {
     contacts.sort((a, b) => a.time - b.time || a.a.id - b.a.id || a.b.id - b.b.id);
     for (const { a, b, time } of contacts) {
       if (!this.bodies.has(a.id) || !this.bodies.has(b.id)) continue;
-      if (a.kind === 'projectile') this.hitBullet(a, b);
-      else if (b.kind === 'projectile') this.hitBullet(b, a);
+      if (a.kind === 'projectile') this.hitProjectile(a, b, time);
+      else if (b.kind === 'projectile') this.hitProjectile(b, a, time);
       else {
+        if (
+          (a.kind === 'tank' && this.convertSquare(a, b)) ||
+          (b.kind === 'tank' && this.convertSquare(b, a))
+        )
+          continue;
         this.separate(a, b, time);
         if (!this.canDamage(a, b)) continue;
         const damageA = this.contactDamage(a) * dt;
@@ -472,7 +836,25 @@ class World implements Simulation {
     }
     for (const body of this.bodies.values()) {
       if (body.kind === 'projectile') {
-        if (this.outside(body)) this.bodies.delete(body.id);
+        if (this.controlled(body)) {
+          const owner = this.players.get(body.ownerPlayerId)?.tank;
+          if (owner) {
+            const dx = body.x - owner.x;
+            const dy = body.y - owner.y;
+            const distance = Math.hypot(dx, dy);
+            if (distance > B.droneLeash) {
+              body.x = owner.x + (dx / distance) * B.droneLeash;
+              body.y = owner.y + (dy / distance) * B.droneLeash;
+              const outward = (body.vx * dx + body.vy * dy) / distance;
+              if (outward > 0) {
+                body.vx -= (outward * dx) / distance;
+                body.vy -= (outward * dy) / distance;
+              }
+            }
+          }
+          this.bound(body);
+        } else if (body.family === 'trap') this.bound(body);
+        else if (this.outside(body)) this.expireProjectile(body);
       } else this.bound(body);
     }
   }
@@ -480,6 +862,9 @@ class World implements Simulation {
   private canDamage(a: Body, b: Body): boolean {
     if ((a.kind === 'tank' && a.spawnProtected) || (b.kind === 'tank' && b.spawnProtected))
       return false;
+    // Produire des drones ne révèle pas Manager ; leurs attaques attendent la fin
+    // de protection ou une intention offensive explicite du propriétaire.
+    if (this.protectedDrone(a) || this.protectedDrone(b)) return false;
     if (a.kind === 'projectile' && b.kind === 'tank' && a.ownerPlayerId === b.playerId)
       return false;
     if (b.kind === 'projectile' && a.kind === 'tank' && b.ownerPlayerId === a.playerId)
@@ -490,27 +875,67 @@ class World implements Simulation {
     return MODE_RULES[this.config.mode].canDamage(this.context, a.team, b.team);
   }
 
-  private hitBullet(bullet: Bullet, target: Body): void {
-    if (!this.canDamage(bullet, target) || bullet.hits.has(target.id)) return;
-    bullet.hits.add(target.id);
+  private protectedDrone(body: Body): boolean {
+    if (body.kind !== 'projectile' || !this.controlled(body)) return false;
+    const owner = this.players.get(body.ownerPlayerId)?.tank;
+    return owner?.id === body.ownerId && owner.spawnProtected;
+  }
+
+  private hitProjectile(bullet: Projectile, target: Body, time: number): void {
+    if (!this.canDamage(bullet, target)) return;
+    if (this.convertSquare(bullet, target)) return;
+    const repeat = this.controlled(bullet) || bullet.family === 'trap';
+    if (repeat ? (bullet.nextHits.get(target.id) ?? 0) > this.tick : bullet.hits.has(target.id))
+      return;
+    if (repeat)
+      bullet.nextHits.set(target.id, this.tick + Math.ceil(B.contactReload * this.config.tickRate));
+    else bullet.hits.add(target.id);
     if (target.kind === 'projectile') {
-      if (target.hits.has(bullet.id)) return;
-      target.hits.add(bullet.id);
-      this.damage(bullet, target.damage, this.attacker(target));
-      this.damage(target, bullet.damage, this.attacker(bullet));
+      const targetRepeat = this.controlled(target) || target.family === 'trap';
+      if (
+        targetRepeat
+          ? (target.nextHits.get(bullet.id) ?? 0) > this.tick
+          : target.hits.has(bullet.id)
+      )
+        return;
+      if (targetRepeat)
+        target.nextHits.set(
+          bullet.id,
+          this.tick + Math.ceil(B.contactReload * this.config.tickRate),
+        );
+      else target.hits.add(bullet.id);
+      // Consommer les deux coups avant les destructions (explosion éventuelle comprise).
+      const deadA = this.hurt(bullet, target.damage);
+      const deadB = this.hurt(target, bullet.damage);
+      if (deadA) {
+        this.placeExplosion(bullet, time);
+        this.destroy(bullet, this.attacker(target));
+      }
+      if (deadB) {
+        this.placeExplosion(target, time);
+        this.destroy(target, this.attacker(bullet));
+      }
     } else {
-      // Chaque balle n'applique qu'un impact par cible. Pénétration = réserve consommée,
-      // indépendante des dégâts ; évite les dégâts multipliés par le nombre de sous-pas.
       const resistance =
         target.kind === 'tank' ? 14 + this.players.get(target.playerId)!.stats.bodyDamage * 3 : 8;
       this.damage(target, bullet.damage, this.attacker(bullet));
-      this.damage(bullet, resistance, this.attacker(target));
+      if (bullet.missile === 'firework') {
+        this.placeExplosion(bullet, time);
+        this.destroy(bullet, this.attacker(target));
+      } else this.damage(bullet, resistance, this.attacker(target));
     }
+  }
+
+  private placeExplosion(body: Projectile, time: number): void {
+    if (body.missile !== 'firework') return;
+    body.x = body.prevX + (body.x - body.prevX) * time;
+    body.y = body.prevY + (body.y - body.prevY) * time;
   }
 
   private contactDamage(body: Tank | Shape): number {
     return body.kind === 'tank'
-      ? B.bodyDamage + this.players.get(body.playerId)!.stats.bodyDamage * B.bodyDamagePerStat
+      ? (B.bodyDamage + this.players.get(body.playerId)!.stats.bodyDamage * B.bodyDamagePerStat) *
+          (getClassDefinition(body.classId)!.bodyDamage ?? 1)
       : 12;
   }
 
@@ -524,6 +949,10 @@ class World implements Simulation {
     if (body.health <= 0 || !this.bodies.has(body.id)) return false;
     body.health = Math.max(0, body.health - amount);
     body.lastDamageTick = this.tick;
+    if (body.kind === 'tank') {
+      body.opacity = 1;
+      body.idleSince = this.tick;
+    }
     return body.health === 0;
   }
 
@@ -532,10 +961,15 @@ class World implements Simulation {
   }
 
   private destroy(body: Body, attacker: Attacker): void {
-    this.bodies.delete(body.id);
+    if (body.kind === 'projectile') {
+      this.expireProjectile(body);
+      return;
+    }
+    this.removeBody(body);
     if (body.kind === 'shape') this.reward(attacker.playerId, body.reward);
     else if (body.kind === 'tank') {
       const player = this.players.get(body.playerId)!;
+      this.cleanupControlled(body.id);
       player.tank = null;
       player.x = body.x;
       player.y = body.y;
@@ -576,22 +1010,26 @@ class World implements Simulation {
     const nx = distance > 1e-9 ? dx / distance : a.id < b.id ? 1 : -1;
     const ny = distance > 1e-9 ? dy / distance : 0;
     const penetration = Math.max(0, radii - distance);
-    a.x -= (nx * penetration) / 2;
-    a.y -= (ny * penetration) / 2;
-    b.x += (nx * penetration) / 2;
-    b.y += (ny * penetration) / 2;
+    const massA = a.kind === 'tank' ? (getClassDefinition(a.classId)!.mass ?? 1) : 1;
+    const massB = b.kind === 'tank' ? (getClassDefinition(b.classId)!.mass ?? 1) : 1;
+    const shareA = massB / (massA + massB);
+    const shareB = massA / (massA + massB);
+    a.x -= nx * penetration * shareA;
+    a.y -= ny * penetration * shareA;
+    b.x += nx * penetration * shareB;
+    b.y += ny * penetration * shareB;
     const approach = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
     if (approach > 0) {
-      a.vx -= (nx * approach) / 2;
-      a.vy -= (ny * approach) / 2;
-      b.vx += (nx * approach) / 2;
-      b.vy += (ny * approach) / 2;
+      a.vx -= nx * approach * shareA;
+      a.vy -= ny * approach * shareA;
+      b.vx += nx * approach * shareB;
+      b.vy += ny * approach * shareB;
     }
     this.bound(a);
     this.bound(b);
   }
 
-  private bound(body: Tank | Shape): void {
+  private bound(body: Body): void {
     const { width, height } = this.config.arena;
     const bounce = body.kind === 'shape' ? -1 : 0;
     if (body.x < body.radius) {
@@ -666,8 +1104,8 @@ class World implements Simulation {
     const definition = this.definition(player);
     const view = B.view * definition.view;
     const entities: EntityState[] = [];
-    const x = player.tank?.x ?? player.x;
-    const y = player.tank?.y ?? player.y;
+    const x = (player.tank?.x ?? player.x) + (player.tank?.cameraOffset?.x ?? 0);
+    const y = (player.tank?.y ?? player.y) + (player.tank?.cameraOffset?.y ?? 0);
     for (const body of this.bodies.values()) {
       const extent = view + B.viewMargin + body.radius;
       if (Math.abs(body.x - x) > extent || Math.abs(body.y - y) > extent) continue;
@@ -694,6 +1132,10 @@ class World implements Simulation {
           maxHealth: body.maxHealth,
           opacity: body.opacity,
           barrelShots: [...body.barrelShots],
+          ...(body.barrelAngles && getClassDefinition(body.classId)!.barrels.some((b) => b.auto)
+            ? { barrelAngles: [...body.barrelAngles] }
+            : {}),
+          ...(body.cameraOffset ? { cameraOffset: { ...body.cameraOffset } } : {}),
           spawnProtected: body.spawnProtected,
         });
       else if (body.kind === 'shape')
@@ -710,6 +1152,9 @@ class World implements Simulation {
           ...base,
           kind: 'projectile',
           family: body.family,
+          ...(body.bodyShape ? { bodyShape: body.bodyShape } : {}),
+          ...(body.classId ? { classId: body.classId } : {}),
+          ...(body.barrelShots ? { barrelShots: [...body.barrelShots] } : {}),
           ownerId: body.ownerId,
           health: body.health,
           maxHealth: body.maxHealth,

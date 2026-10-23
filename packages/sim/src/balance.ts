@@ -1,3 +1,21 @@
+import type { BarrelDefinition } from '@diep-fried/shared';
+
+const secondaryBarrel: BarrelDefinition = {
+  angle: 0,
+  offset: 0,
+  length: 1.4,
+  width: 0.45,
+  delay: 0,
+  projectile: 'bullet',
+  reload: 1,
+  damage: 0.5,
+  penetration: 0.65,
+  speed: 0.9,
+  spread: 0,
+  recoil: 0.4,
+  lifetime: 1.5,
+};
+
 /** Coefficients de conception diep-fried.io, à calibrer en partie ; unités seconde/monde. */
 export const BALANCE = {
   tankRadius: 25,
@@ -29,6 +47,22 @@ export const BALANCE = {
   viewMargin: 100,
   gridSize: 128,
   bodyStepDistance: 8,
+  projectilesPerOwner: 512,
+  trapsPerOwner: 80,
+  missilesPerOwner: 24,
+  droneLifetime: 120,
+  droneOrbit: 85,
+  droneLeash: 1200,
+  droneSteering: 6,
+  autoRange: 750,
+  trapFriction: 4,
+  contactReload: 0.35,
+  secondaryReload: 0.3,
+  gliderTurn: 0.4,
+  missileAcceleration: 100,
+  fireworkFragments: 16,
+  secondaryBarrel,
+  fragmentBarrel: { ...secondaryBarrel, damage: 0.8, recoil: 0, lifetime: 1.8 },
 } as const;
 
 /** Courbe originale quadratique : niveau 45 à 23 540 XP (score = XP). */

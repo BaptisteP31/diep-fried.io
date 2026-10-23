@@ -29,6 +29,7 @@ export function contactTime(a: MovingCircle, b: MovingCircle): number | null {
 export function collisionCandidates<T extends MovingCircle>(
   bodies: T[],
   cellSize: number,
+  includePair: (a: T, b: T) => boolean = () => true,
 ): [T, T][] {
   const cells = new Map<string, T[]>();
   const pairs = new Map<string, [T, T]>();
@@ -43,6 +44,7 @@ export function collisionCandidates<T extends MovingCircle>(
         let cell = cells.get(key);
         if (!cell) cells.set(key, (cell = []));
         for (const other of cell) {
+          if (!includePair(body, other)) continue;
           const a = body.id < other.id ? body : other;
           const b = body.id < other.id ? other : body;
           pairs.set(`${a.id},${b.id}`, [a, b]);
