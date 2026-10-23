@@ -1,11 +1,12 @@
-# Simulation FFA / Sandbox
+# Simulation FFA / Sandbox / Teams / Maze
 
 `createSimulation({ config, seed })` est le nouvel export de simulation autoritaire,
 conforme à `Simulation`, choisie par défaut par le serveur.
 `createPlaceholderSimulation` reste disponible. Le registre partagé contient les
 **54 classes** du catalogue (1/4/13/36 aux niveaux 1/15/30/45), toutes accessibles.
 Les coefficients sont des choix calibrables de diep-fried.io, sans revendication
-numérique de fidélité. Aucun changement de commande ou de codec dans ce lot.
+numérique de fidélité. Les modes `ffa`, `sandbox`, `teams2`, `teams4` et `maze` sont jouables.
+Le protocole reste en version 1 ; les commandes Sandbox sont des ajouts à l’union existante.
 
 ## Règles de cette implémentation
 
@@ -110,12 +111,13 @@ Le rejeu chargé couvre 8 joueurs et les 200 formes du preset FFA pendant 300 ti
 `test/spatial.test.ts` vérifie aussi des trajectoires de 2 000 unités par tick et
 les paires traversant plusieurs cellules.
 
-Le serveur utilise cette fabrique par défaut. Équipes, murs Maze, nid/alpha/crashers
-et triche réseau Sandbox ne font pas partie de ce lot.
+Le serveur utilise cette fabrique par défaut. Nid/alpha/crashers, objectifs et boss
+ne font pas partie de ce lot.
 Les formes utilisent des collisions circulaires, une dérive initiale et une rotation,
-sans IA ni régénération. L'apparition cherche une zone dégagée pendant 32 essais,
-puis prend la meilleure candidate : une arène saturée peut encore contenir des
-chevauchements initiaux. Le filtre de vue économise le réseau, pas la simulation.
+sans IA ni régénération. L'apparition cherche une zone dégagée pendant 128 essais au maximum, puis
+utilise une grille déterministe dans la zone autorisée. Une arène saturée retarde
+le spawn initial (ou refuse cette demande de respawn) plutôt que de placer dans un
+mur, une base ennemie ou un autre corps. Le filtre de vue économise le réseau, pas la simulation.
 La physique de foule compacte est approchée par séparation locale ; le balayage
 continu garantit la détection des balles, sans résoudre un système rigide global.
 
@@ -225,3 +227,75 @@ CPU maximal : le ciblage autonome parcourt encore les corps du monde.
 Niveaux/classes indiqués à l'initialisation ; les morts/réapparitions suivent les
 règles FFA ordinaires et peuvent réduire le niveau et ramener à une branche antérieure.
 `swarm` tente de reprendre son chemin de classe au niveau autorisé après réapparition.
+
+## Teams et Maze : configuration et règles
+
+Le serveur choisit `seed` **avant** la génération, puis appelle
+`prepareModeConfig(resolveModeConfig(mode, options), seed)` (export additionnel de
+`@diep-fried/sim`). Le résultat contient les rectangles définitifs : `Room` reçoit
+cette configuration et la passe à la simulation ; `room.joined.config` transmet
+la même carte. `createSimulation` copie la configuration reçue sans la régénérer.
+Un appelant hors serveur doit donc appeler `prepareModeConfig` lui-même pour les
+presets Teams/Maze. Les cartes explicitement fournies sont préservées. Le helper
+importe les générateurs locaux de `src/maps`, sans les modifier.
+
+`teams2` déclare Bleu/Rouge ; `teams4` ajoute Vert/Violet, identifiants 1–4.
+Au join, le camp le moins peuplé est choisi, égalités selon l'ordre des équipes.
+Le comptage inclut les morts encore connectés ; le respawn conserve le camp.
+Les alliés ne se blessent pas avec les presets sans friendly fire, y compris par
+corps, drones, minions et projectiles. Les corps alliés restent solides.
+Les spawns sont contenus dans la zone `spawn` de leur base, au rayon près.
+
+La base est un sanctuaire **autoritaire** : tanks ennemis et formes neutres sont
+bloqués à son périmètre, les tirs ennemis y sont détruits. Le mouvement est balayé,
+y compris pour les drones/minions ; aucune commande god ne contourne la barrière.
+Un tank entièrement dans sa propre base est invulnérable même en tirant ;
+`spawnProtected` expose cette protection par le champ existant. Les projectiles
+alliés peuvent sortir. Les formes neutres apparaissent et dérivent hors des bases.
+Quatre drones indestructibles par base, rayon 18, vitesse maximale 500, dégâts 120
+par impact (rechargement de contact ordinaire), chassent les tanks hostiles dans
+une bande extérieure de 220 unités puis reviennent en garde. Ils sont transmis
+comme `ProjectileState` de famille `drone`, équipe de la base et `ownerId` égal à
+leur propre identifiant ; aucun propriétaire humain ni récompense de kill.
+Ce sont des paramètres calibrables, pas des valeurs historiques. Les gardes utilisent
+le rendu de projectile existant, sans nouvelle famille d'entité ni modification client.
+
+Maze utilise les rectangles générés par `generateMaze`. Tous les corps subissent
+un balayage cercle/rectangle : glissement des tanks/drones/minions/pièges et rebond
+des formes. Les tirs balistiques sont supprimés au premier mur, après les impacts
+antérieurs ; Firework explose au point d'arrêt. La bouche des canons est aussi
+balayée pour empêcher un tir de naître derrière un mur. La séparation des corps et
+la remise en laisse des drones ne peuvent pas les téléporter à travers les murs.
+Le ciblage autonome (tourelles, drones et minions) requiert une ligne de vue libre.
+Il n'y a pas de recherche de chemin : une unité guidée vers l'autre côté d'un mur
+reste bloquée ou glisse, jusqu'à ce que sa cible ou la commande change.
+
+## Commandes Sandbox (extension additive v1)
+
+`PlayerCommand` accepte `{ type: 'sandbox', action }`, où `action` vaut uniquement
+`levelUp | cycleClass | selfDestruct | toggleGod`. Le codec valide cette liste et
+reconstruit l'objet ; niveau, classe ou booléen d'autorisation fournis en plus sont
+ignorés. La simulation vérifie **uniquement** `config.sandbox.cheats` et la présence
+d'un tank vivant. Le preset Sandbox l'active ; FFA/Teams/Maze le désactivent. Les
+messages valides mais non autorisés sont ignorés, sans événement ni changement.
+
+- `levelUp` ajoute exactement un niveau jusqu'à `min(45, maxLevel)`, en complétant
+  l'XP du prochain seuil. Les points et l'événement `levelUp` suivent les règles
+  ordinaires ; au plafond il ne se passe rien.
+- `cycleClass` parcourt les 54 clés du catalogue dans leur ordre de déclaration,
+  puis revient à Tank, indépendamment du niveau requis. Niveau, score et stats
+  compatibles sont conservés ; les stats hors plafond sont remboursées. Canons,
+  rechargements, camouflage et caméra sont réinitialisés, les anciens drones/minions
+  sont nettoyés ; les autres projectiles suivent les règles ordinaires de changement
+  de classe. La santé conserve les dégâts reçus, avec au moins 1 PV.
+- `selfDestruct` émet la mort ordinaire, même sous god, sans XP de kill pour personne.
+  Les conditions de respawn restent celles du mode. Les gains posthumes de tirs déjà
+  présents suivent la règle ordinaire ; le suicide ne donne lui-même aucun XP.
+- `toggleGod` commute l'immunité, exposée par `spawnProtected`, et résiste aux tirs
+  même en tirant. Le second toggle rétablit la protection ordinaire de spawn/base.
+  L'état god est effacé à la mort/au respawn ; il ne se transmet pas à une nouvelle vie.
+
+`test/modes-gameplay.test.ts` couvre équilibrage et réapparition, alliés, bases et
+neutralité des récompenses des gardes, spawns et formes hors murs, tirs rapides,
+LoS, drones/minions, les quatre actions et leur refus sans autorisation. Les tests
+codec couvrent les nouveaux modes et les actions inconnues/mal typées.

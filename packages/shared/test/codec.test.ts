@@ -11,6 +11,29 @@ const validInput = {
   alt: false,
 };
 
+describe('extensions additives v1 modes et sandbox', () => {
+  it.each(['teams2', 'teams4', 'maze'])('accepte le mode %s', (mode) => {
+    expect(decode({ t: 'room.create', name: '', mode }).ok).toBe(true);
+  });
+  it.each(['levelUp', 'cycleClass', 'selfDestruct', 'toggleGod'])(
+    'valide et nettoie sandbox.%s',
+    (action) => {
+      expect(
+        decode({ t: 'command', command: { type: 'sandbox', action, level: 999, cheats: true } }),
+      ).toEqual({
+        ok: true,
+        message: { t: 'command', command: { type: 'sandbox', action } },
+      });
+    },
+  );
+  it.each([undefined, null, true, 1, {}, [], 'levelup', 'teleport', 'constructor'])(
+    'rejette une action sandbox invalide : %s',
+    (action) => {
+      expect(decode({ t: 'command', command: { type: 'sandbox', action } }).ok).toBe(false);
+    },
+  );
+});
+
 describe('decodeClientMessage', () => {
   it('accepte chaque message client valide', () => {
     const messages = [

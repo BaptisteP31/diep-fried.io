@@ -1,4 +1,5 @@
 import {
+  CLASS_DEFINITIONS,
   DEFAULT_STAT_CAP,
   NEUTRAL_TEAM,
   STARTING_CLASS,
@@ -13,6 +14,8 @@ import {
   type PlayerCommand,
   type PlayerId,
   type PlayerInput,
+  type MapZone,
+  type Rect,
   type ProjectileFamily,
   type ProjectileState,
   type ShapeState,
@@ -23,6 +26,7 @@ import {
 import { BALANCE as B, pointsForLevel, scoreForLevel } from './balance';
 import { MODE_RULES, type ModeContext } from './modes';
 import { Rng } from './rng';
+import { circleVsWall, circleVsWalls, resolveCircleVsWall, sweepCircleVsWalls } from './maps';
 import { collisionCandidates, contactTime } from './spatial';
 import type {
   PlayerProfile,
@@ -58,6 +62,8 @@ interface Projectile extends ProjectileState, Motion {
   secondaryActive: boolean;
   nextSecondary: number;
   missile: BarrelDefinition['missile'];
+  /** Drones autoritaires de base : aucun joueur, aucune récompense. */
+  base?: MapZone;
 }
 interface Shape extends ShapeState, Motion {
   reward: number;
@@ -80,6 +86,7 @@ interface Player {
   classId: ClassId;
   stats: StatLevels;
   spent: number;
+  god: boolean;
   x: number;
   y: number;
 }
@@ -98,6 +105,8 @@ class World implements Simulation {
   private readonly players = new Map<PlayerId, Player>();
   private readonly bodies = new Map<number, Body>();
   private readonly projectileCounts = new Map<number, Record<ProjectileFamily, number>>();
+  private readonly obstacleCache = new Map<number, Rect[]>();
+  private readonly teamSizes = new Map<number, number>();
   private commands: { playerId: PlayerId; command: PlayerCommand }[] = [];
   private events: SimEvent[] = [];
 
@@ -112,7 +121,7 @@ class World implements Simulation {
   }
 
   private get context(): ModeContext {
-    return { config: this.config, rng: this.rng, tick: this.tick };
+    return { config: this.config, rng: this.rng, tick: this.tick, teamSizes: this.teamSizes };
   }
 
   private definition(player: Player): ClassDefinition {
@@ -159,14 +168,23 @@ class World implements Simulation {
       classId: STARTING_CLASS,
       stats: emptyStatLevels(),
       spent: 0,
+      god: false,
       x: this.config.arena.width / 2,
       y: this.config.arena.height / 2,
     });
+    const team = this.players.get(playerId)!.team;
+    this.teamSizes.set(team, (this.teamSizes.get(team) ?? 0) + 1);
   }
 
   removePlayer(playerId: PlayerId): void {
     const player = this.players.get(playerId);
     if (player?.tank) this.removeBody(player.tank);
+    if (player) {
+      const remaining = (this.teamSizes.get(player.team) ?? 1) - 1;
+      if (remaining > 0) this.teamSizes.set(player.team, remaining);
+      else this.teamSizes.delete(player.team);
+      this.obstacleCache.delete(player.team);
+    }
     this.players.delete(playerId);
     for (const body of this.bodies.values()) {
       if (body.kind === 'projectile' && body.ownerPlayerId === playerId) this.removeBody(body);
@@ -198,7 +216,7 @@ class World implements Simulation {
     const tank = player.tank;
     if (!tank || tank.health <= 0) return;
     const maxHealth = this.maxHealth(player);
-    tank.health += maxHealth - tank.maxHealth;
+    tank.health = Math.max(1, tank.health + maxHealth - tank.maxHealth);
     tank.maxHealth = maxHealth;
     tank.level = player.level;
     tank.score = player.score;
@@ -219,7 +237,15 @@ class World implements Simulation {
   }
 
   private spawn(playerId: PlayerId, player: Player, respawn: boolean): void {
+    const radius = Math.min(
+      B.tankRadius,
+      this.config.arena.width / 2,
+      this.config.arena.height / 2,
+    );
+    const at = this.spawnPoint(radius, player.team);
+    if (!at) return;
     if (respawn) {
+      player.god = false;
       player.score = Math.floor(player.score * this.config.progression.scoreKeptOnDeath);
       player.level = this.levelForScore(player.score);
       player.classId = STARTING_CLASS;
@@ -227,12 +253,6 @@ class World implements Simulation {
       player.spent = 0;
       player.input = null;
     }
-    const radius = Math.min(
-      B.tankRadius,
-      this.config.arena.width / 2,
-      this.config.arena.height / 2,
-    );
-    const at = this.spawnPoint(radius, player.team);
     const definition = this.definition(player);
     const tank: Tank = {
       kind: 'tank',
@@ -271,24 +291,85 @@ class World implements Simulation {
     this.events.push({ type: 'spawn', playerId });
   }
 
-  /** Choisit le premier emplacement libre, sinon le moins encombré après 32 essais. */
-  private spawnPoint(radius: number, team: number): { x: number; y: number } {
-    let best = { x: this.config.arena.width / 2, y: this.config.arena.height / 2 };
+  /** Les murs et bases sont exclus sans exception, même si l'arène est saturée. */
+  private spawnPoint(radius: number, team: number): { x: number; y: number } | undefined {
+    let best: { x: number; y: number } | undefined;
     let bestGap = -Infinity;
-    for (let attempt = 0; attempt < 32; attempt++) {
-      const at = MODE_RULES[this.config.mode].spawnPoint(this.context, team, radius);
+    const blocked = this.obstacles(team);
+    const consider = (at: { x: number; y: number }): boolean => {
+      if (circleVsWalls(at.x, at.y, radius, blocked)) return false;
       let gap = Infinity;
       for (const body of this.bodies.values()) {
         if (body.kind === 'projectile') continue;
         gap = Math.min(gap, Math.hypot(at.x - body.x, at.y - body.y) - radius - body.radius);
       }
-      if (gap > bestGap) {
+      if (gap >= 0 && gap > bestGap) {
         best = at;
         bestGap = gap;
       }
-      if (gap >= 100) return at;
+      return gap >= 100;
+    };
+    for (let attempt = 0; attempt < 128; attempt++) {
+      const at = MODE_RULES[this.config.mode].spawnPoint(this.context, team, radius);
+      if (consider(at)) return at;
+      if (attempt === 31 && best) return best;
     }
+    if (best) return best;
+    // Repli déterministe dans la zone d'apparition, jamais sur un mur.
+    const area = this.config.map.zones.find((z) => z.kind === 'spawn' && z.team === team)?.area ?? {
+      x: 0,
+      y: 0,
+      ...this.config.arena,
+    };
+    const stride = Math.max(8, radius);
+    for (let y = area.y + radius; y <= area.y + area.height - radius; y += stride)
+      for (let x = area.x + radius; x <= area.x + area.width - radius; x += stride)
+        if (consider({ x, y })) return best;
     return best;
+  }
+
+  private changeClass(player: Player, classId: ClassId): void {
+    player.classId = classId;
+    const tank = player.tank!;
+    const barrels = this.definition(player).barrels;
+    tank.barrelShots = barrels.map(() => -1);
+    tank.nextShots = barrels.map(() => this.tick / this.config.tickRate);
+    tank.activeBarrels = barrels.map(() => false);
+    tank.barrelAngles = barrels.map((b) => tank.angle + b.angle);
+    delete tank.cameraOffset;
+    tank.idleSince = this.tick;
+    tank.opacity = 1;
+    const caps = this.caps(player);
+    for (const stat of STAT_IDS) {
+      const refund = Math.max(0, player.stats[stat] - caps[stat]);
+      player.stats[stat] -= refund;
+      player.spent -= refund;
+    }
+    this.cleanupControlled(tank.id);
+    this.syncTank(player);
+  }
+
+  private sandboxCommand(playerId: PlayerId, player: Player, action: string): void {
+    if (!this.config.sandbox.cheats || !player.tank) return;
+    switch (action) {
+      case 'levelUp': {
+        const level = Math.min(45, this.config.progression.maxLevel, player.level + 1);
+        if (level > player.level)
+          this.reward(playerId, Math.max(0, scoreForLevel(level) - player.score));
+        break;
+      }
+      case 'cycleClass': {
+        const catalog = Object.keys(CLASS_DEFINITIONS);
+        this.changeClass(player, catalog[(catalog.indexOf(player.classId) + 1) % catalog.length]!);
+        break;
+      }
+      case 'selfDestruct':
+        this.destroy(player.tank, { playerId, name: player.name });
+        break;
+      case 'toggleGod':
+        player.god = !player.god;
+        break;
+    }
   }
 
   private applyCommands(): void {
@@ -297,7 +378,9 @@ class World implements Simulation {
     for (const { playerId, command } of commands) {
       const player = this.players.get(playerId);
       if (!player) continue;
-      if (command.type === 'respawn') {
+      if (command.type === 'sandbox') {
+        this.sandboxCommand(playerId, player, command.action);
+      } else if (command.type === 'respawn') {
         if (!player.tank && player.respawnTick !== null && this.tick >= player.respawnTick) {
           this.spawn(playerId, player, true);
         }
@@ -312,25 +395,7 @@ class World implements Simulation {
         command.type === 'chooseClass' &&
         this.choices(player).includes(command.classId)
       ) {
-        player.classId = command.classId;
-        const tank = player.tank;
-        tank.barrelShots = this.definition(player).barrels.map(() => -1);
-        tank.nextShots = this.definition(player).barrels.map(
-          () => this.tick / this.config.tickRate,
-        );
-        tank.activeBarrels = this.definition(player).barrels.map(() => false);
-        tank.barrelAngles = this.definition(player).barrels.map((b) => tank.angle + b.angle);
-        tank.idleSince = this.tick;
-        tank.opacity = 1;
-        // Les statistiques devenues interdites sont remboursées, sans perdre les autres points.
-        const caps = this.caps(player);
-        for (const stat of STAT_IDS) {
-          const refund = Math.max(0, player.stats[stat] - caps[stat]);
-          player.stats[stat] -= refund;
-          player.spent -= refund;
-        }
-        this.cleanupControlled(tank.id);
-        this.syncTank(player);
+        this.changeClass(player, command.classId);
       }
     }
   }
@@ -343,6 +408,7 @@ class World implements Simulation {
       if (player.input) player.appliedSeq = player.input.seq;
     }
     this.applyCommands();
+    this.populateBaseDefenders();
     const dt = 1 / this.config.tickRate;
     for (const player of this.players.values()) this.prepareTank(player, dt);
     this.prepareProjectiles(dt);
@@ -389,7 +455,7 @@ class World implements Simulation {
     if (!tank) return;
     const input = player.input;
     const definition = this.definition(player);
-    tank.spawnProtected = this.tick < tank.protectedUntil;
+    tank.spawnProtected = this.tick < tank.protectedUntil || player.god || this.inOwnBase(tank);
     if (input && (input.aim.x !== 0 || input.aim.y !== 0))
       tank.angle = Math.atan2(input.aim.y, input.aim.x);
     const move = input?.move ?? { x: 0, y: 0 };
@@ -405,7 +471,7 @@ class World implements Simulation {
     }
     const now = this.tick / this.config.tickRate;
     if (input?.fire || input?.alt) {
-      tank.spawnProtected = false;
+      tank.spawnProtected = player.god || this.inOwnBase(tank);
       tank.protectedUntil = this.tick;
     }
     let manualShot = false;
@@ -426,7 +492,7 @@ class World implements Simulation {
         if (this.launch(tank, player, barrel, angle)) {
           tank.barrelShots[index] = this.tick;
           if (!controlled) {
-            tank.spawnProtected = false;
+            tank.spawnProtected = player.god || this.inOwnBase(tank);
             tank.protectedUntil = this.tick;
             if (!barrel.auto) manualShot = true;
           }
@@ -601,6 +667,20 @@ class World implements Simulation {
           ? { barrelShots: [-1, -1] }
           : {}),
       };
+      const mouth = sweepCircleVsWalls(
+        source.x,
+        source.y,
+        x,
+        y,
+        body.radius,
+        this.obstacles(body.team),
+      );
+      if (mouth.hit) {
+        body.x = mouth.contactX + mouth.normalX * 1e-6;
+        body.y = mouth.contactY + mouth.normalY * 1e-6;
+        body.prevX = body.x;
+        body.prevY = body.y;
+      }
       if (persistent) this.bound(body);
       if (!this.outside(body)) {
         this.addProjectile(body);
@@ -620,6 +700,7 @@ class World implements Simulation {
     for (const body of this.bodies.values()) {
       if (body.kind === 'projectile' || !this.canDamage(source, body)) continue;
       if (body.kind === 'tank' && body.opacity < 0.15) continue;
+      if (!this.lineOfSight(source, body)) continue;
       const d = (body.x - source.x) ** 2 + (body.y - source.y) ** 2;
       if (d < distance || (d === distance && body.id < (best?.id ?? Infinity))) {
         best = body;
@@ -635,6 +716,10 @@ class World implements Simulation {
       if (body.kind !== 'projectile' || body.expires <= this.tick) continue;
       for (const [id, deadline] of body.nextHits)
         if (deadline <= this.tick) body.nextHits.delete(id);
+      if (body.base) {
+        this.prepareBaseDefender(body, dt);
+        continue;
+      }
       const player = this.players.get(body.ownerPlayerId);
       if (!player) {
         this.removeBody(body);
@@ -791,13 +876,182 @@ class World implements Simulation {
     return true;
   }
 
+  private obstacles(team: number): Rect[] {
+    let walls = this.obstacleCache.get(team);
+    if (!walls) {
+      walls = [
+        ...this.config.map.walls,
+        ...this.config.map.zones
+          .filter((z) => z.kind === 'base' && z.team !== team)
+          .map((z) => z.area),
+      ];
+      this.obstacleCache.set(team, walls);
+    }
+    return walls;
+  }
+
+  private inOwnBase(body: Body): boolean {
+    return this.config.map.zones.some(
+      ({ kind, team, area: a }) =>
+        kind === 'base' &&
+        team === body.team &&
+        body.x - body.radius >= a.x &&
+        body.y - body.radius >= a.y &&
+        body.x + body.radius <= a.x + a.width &&
+        body.y + body.radius <= a.y + a.height,
+    );
+  }
+
+  private lineOfSight(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
+    return !sweepCircleVsWalls(a.x, a.y, b.x, b.y, 0.001, this.config.map.walls).hit;
+  }
+
+  /** Mouvement balayé et glissement ; les formes rebondissent, les autres s'arrêtent sur la normale. */
+  private moveSolid(body: Body, x: number, y: number): void {
+    const walls = this.obstacles(body.team);
+    let fromX = body.x;
+    let fromY = body.y;
+    let dx = x - fromX;
+    let dy = y - fromY;
+    for (let i = 0; i < 4; i++) {
+      const hit = sweepCircleVsWalls(fromX, fromY, fromX + dx, fromY + dy, body.radius, walls);
+      if (!hit.hit) {
+        fromX += dx;
+        fromY += dy;
+        break;
+      }
+      fromX = hit.contactX + hit.normalX * 1e-6;
+      fromY = hit.contactY + hit.normalY * 1e-6;
+      const normalSpeed = body.vx * hit.normalX + body.vy * hit.normalY;
+      if (normalSpeed < 0) {
+        const factor = body.kind === 'shape' ? 2 : 1;
+        body.vx -= factor * normalSpeed * hit.normalX;
+        body.vy -= factor * normalSpeed * hit.normalY;
+      }
+      dx *= 1 - hit.time;
+      dy *= 1 - hit.time;
+      const inward = Math.min(0, dx * hit.normalX + dy * hit.normalY);
+      dx -= inward * hit.normalX;
+      dy -= inward * hit.normalY;
+      if (Math.hypot(dx, dy) < 1e-6) break;
+    }
+    body.x = fromX;
+    body.y = fromY;
+    // Corrige aussi les chevauchements dus à une séparation entre corps.
+    for (let i = 0; i < 4; i++)
+      for (const wall of walls)
+        if (circleVsWall(body, wall)) {
+          const at = resolveCircleVsWall(body.x, body.y, body.radius, wall);
+          body.x = at.x;
+          body.y = at.y;
+        }
+  }
+
+  private defenderAnchor(base: MapZone, index: number): { x: number; y: number } {
+    const a = base.area;
+    if (a.height === this.config.arena.height)
+      return {
+        x: a.x === 0 ? a.x + a.width - 35 : a.x + 35,
+        y: a.y + (a.height * (index + 0.5)) / 4,
+      };
+    return { x: a.x + (index % 2 ? a.width - 35 : 35), y: a.y + (index < 2 ? 35 : a.height - 35) };
+  }
+
+  private populateBaseDefenders(): void {
+    if (this.tick !== 1) return;
+    for (const base of this.config.map.zones.filter((z) => z.kind === 'base'))
+      for (let i = 0; i < 4; i++) {
+        const at = this.defenderAnchor(base, i);
+        const id = this.nextId++;
+        this.addProjectile({
+          kind: 'projectile',
+          family: 'drone',
+          id,
+          ownerId: id,
+          ownerPlayerId: -base.team,
+          ownerName: 'Défense de base',
+          team: base.team,
+          ...at,
+          prevX: at.x,
+          prevY: at.y,
+          vx: 0,
+          vy: 0,
+          angle: 0,
+          radius: 18,
+          health: 1000,
+          maxHealth: 1000,
+          damage: 120,
+          expires: Infinity,
+          hits: new Set(),
+          nextHits: new Map(),
+          lastDamageTick: this.tick,
+          autonomous: true,
+          cruiseSpeed: 500,
+          secondaryActive: false,
+          nextSecondary: Infinity,
+          missile: undefined,
+          base,
+        });
+      }
+  }
+
+  private prepareBaseDefender(body: Projectile, dt: number): void {
+    const base = body.base!;
+    let target: Tank | undefined;
+    let distance = Infinity;
+    for (const other of this.bodies.values()) {
+      if (
+        other.kind !== 'tank' ||
+        !this.canDamage(body, other) ||
+        other.opacity < 0.15 ||
+        !circleVsWall(other.x, other.y, 220, base.area) ||
+        !this.lineOfSight(body, other)
+      )
+        continue;
+      const d = Math.hypot(other.x - body.x, other.y - body.y);
+      if (d < distance) {
+        target = other;
+        distance = d;
+      }
+    }
+    // L'identifiant est stable ; chaque base dispose de quatre points de garde.
+    const index = [...this.bodies.values()]
+      .filter((b) => b.kind === 'projectile' && b.base === base)
+      .findIndex((b) => b.id === body.id);
+    const at = target ?? this.defenderAnchor(base, index);
+    const dx = at.x - body.x;
+    const dy = at.y - body.y;
+    const length = Math.hypot(dx, dy);
+    const speed = Math.min(body.cruiseSpeed, length * B.droneSteering);
+    const decay = Math.exp(-B.droneSteering * dt);
+    body.vx = body.vx * decay + (dx / (length || 1)) * speed * (1 - decay);
+    body.vy = body.vy * decay + (dy / (length || 1)) * speed * (1 - decay);
+    if (length > 1) body.angle = Math.atan2(dy, dx);
+  }
+
   private integrate(dt: number): void {
     const bodies = [...this.bodies.values()];
+    const wallHits = new Map<number, ReturnType<typeof sweepCircleVsWalls>>();
     for (const body of bodies) {
       body.prevX = body.x;
       body.prevY = body.y;
-      body.x += body.vx * dt;
-      body.y += body.vy * dt;
+      const x = body.x + body.vx * dt;
+      const y = body.y + body.vy * dt;
+      if (body.kind !== 'projectile' || this.controlled(body) || body.family === 'trap')
+        this.moveSolid(body, x, y);
+      else {
+        const hit = sweepCircleVsWalls(
+          body.x,
+          body.y,
+          x,
+          y,
+          body.radius,
+          this.obstacles(body.team),
+        );
+        if (hit.hit) wallHits.set(body.id, hit);
+        body.x = x;
+        body.y = y;
+      }
       if (body.kind === 'shape') body.angle += body.spin * dt;
       if (body.kind !== 'projectile') this.bound(body);
     }
@@ -808,7 +1062,16 @@ class World implements Simulation {
       (a, b) => (a.kind !== 'projectile' && b.kind !== 'projectile') || this.canDamage(a, b),
     )) {
       const time = contactTime(a, b);
-      if (time !== null) contacts.push({ a, b, time });
+      if (
+        time !== null &&
+        time < (wallHits.get(a.id)?.time ?? Infinity) &&
+        time < (wallHits.get(b.id)?.time ?? Infinity) &&
+        this.lineOfSight(
+          { x: a.prevX + (a.x - a.prevX) * time, y: a.prevY + (a.y - a.prevY) * time },
+          { x: b.prevX + (b.x - b.prevX) * time, y: b.prevY + (b.y - b.prevY) * time },
+        )
+      )
+        contacts.push({ a, b, time });
     }
     // Un tir rapide atteint la première cible physique, pas la première insérée dans la map.
     contacts.sort((a, b) => a.time - b.time || a.a.id - b.a.id || a.b.id - b.b.id);
@@ -836,15 +1099,25 @@ class World implements Simulation {
     }
     for (const body of this.bodies.values()) {
       if (body.kind === 'projectile') {
-        if (this.controlled(body)) {
+        const wall = wallHits.get(body.id);
+        if (wall) {
+          body.x = wall.contactX;
+          body.y = wall.contactY;
+          this.expireProjectile(body);
+          continue;
+        }
+        if (this.controlled(body) && !body.base) {
           const owner = this.players.get(body.ownerPlayerId)?.tank;
           if (owner) {
             const dx = body.x - owner.x;
             const dy = body.y - owner.y;
             const distance = Math.hypot(dx, dy);
             if (distance > B.droneLeash) {
-              body.x = owner.x + (dx / distance) * B.droneLeash;
-              body.y = owner.y + (dy / distance) * B.droneLeash;
+              this.moveSolid(
+                body,
+                owner.x + (dx / distance) * B.droneLeash,
+                owner.y + (dy / distance) * B.droneLeash,
+              );
               const outward = (body.vx * dx + body.vy * dy) / distance;
               if (outward > 0) {
                 body.vx -= (outward * dx) / distance;
@@ -853,7 +1126,7 @@ class World implements Simulation {
             }
           }
           this.bound(body);
-        } else if (body.family === 'trap') this.bound(body);
+        } else if (body.family === 'trap' || body.base) this.bound(body);
         else if (this.outside(body)) this.expireProjectile(body);
       } else this.bound(body);
     }
@@ -940,13 +1213,17 @@ class World implements Simulation {
   }
 
   private attacker(body: Body): Attacker {
-    if (body.kind === 'projectile') return { playerId: body.ownerPlayerId, name: body.ownerName };
+    if (body.kind === 'projectile')
+      return { playerId: body.base ? null : body.ownerPlayerId, name: body.ownerName };
     if (body.kind === 'tank') return { playerId: body.playerId, name: body.name };
     return { playerId: null, name: body.shape };
   }
 
   private hurt(body: Body, amount: number): boolean {
     if (body.health <= 0 || !this.bodies.has(body.id)) return false;
+    if (body.kind === 'projectile' && body.base) return false;
+    if (body.kind === 'tank' && (this.players.get(body.playerId)?.god || this.inOwnBase(body)))
+      return false;
     body.health = Math.max(0, body.health - amount);
     body.lastDamageTick = this.tick;
     if (body.kind === 'tank') {
@@ -971,6 +1248,7 @@ class World implements Simulation {
       const player = this.players.get(body.playerId)!;
       this.cleanupControlled(body.id);
       player.tank = null;
+      player.god = false;
       player.x = body.x;
       player.y = body.y;
       player.input = null;
@@ -1025,6 +1303,16 @@ class World implements Simulation {
       b.vx += nx * approach * shareB;
       b.vy += ny * approach * shareB;
     }
+    const ax = a.x,
+      ay = a.y,
+      bx = b.x,
+      by = b.y;
+    a.x = a.prevX;
+    a.y = a.prevY;
+    b.x = b.prevX;
+    b.y = b.prevY;
+    this.moveSolid(a, ax, ay);
+    this.moveSolid(b, bx, by);
     this.bound(a);
     this.bound(b);
   }
@@ -1072,6 +1360,7 @@ class World implements Simulation {
         this.config.arena.height / 2,
       );
       const at = this.spawnPoint(radius, NEUTRAL_TEAM);
+      if (!at) break;
       const direction = this.rng.range(0, Math.PI * 2);
       const speed = this.rng.range(12, 28);
       const body: Shape = {
