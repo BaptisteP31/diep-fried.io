@@ -2,6 +2,8 @@ import './style.css';
 import type { ModeConfig, PlayerCommand, ServerMessage } from '@diep-fried/shared';
 import { loadBindings } from './input/bindings';
 import { InputController } from './input/input-controller';
+import { isTypingTarget } from './input/focus';
+import { SandboxCommands } from './input/sandbox';
 import { GameConnection, gameSocketUrl, type RoomIntent } from './net/connection';
 import { worldToScreen } from './render/camera';
 import { drawMinimap } from './render/minimap';
@@ -13,6 +15,8 @@ import { DeathScreen } from './ui/death-screen';
 import { GameHud } from './ui/hud';
 import { Menu } from './ui/menu';
 import { UpgradeTreeModal } from './ui/upgrade-tree-modal';
+import { SandboxPanel } from './ui/sandbox-panel';
+import { setupDisplaySettings } from './ui/display-settings';
 
 /** Intervalle maximal sans envoi d'intention, même si rien ne change. */
 const INPUT_KEEPALIVE_MS = 250;
@@ -40,6 +44,7 @@ const pingSentTimes = new Map<number, number>();
 const controlsModal = new ControlsModal({
   onBindingsChanged: (newBindings) => {
     input.setBindings(newBindings);
+    sandboxPanel.setBindings(newBindings);
   },
   onVisibilityChanged: () => syncInputAvailability(),
 });
@@ -60,8 +65,8 @@ const deathScreen = new DeathScreen({
 
 // Menu d'accueil et salon
 const menu = new Menu({
-  create: (name, mode) => {
-    enterRoom({ t: 'room.create', name, mode, options: {} });
+  create: (name, mode, options) => {
+    enterRoom({ t: 'room.create', name, mode, options });
   },
   join: (name, code, resumeToken) => {
     enterRoom({
@@ -73,6 +78,19 @@ const menu = new Menu({
   },
   onOpenControls: () => controlsModal.show(),
 });
+
+const sandboxCommands = new SandboxCommands(
+  () => ({
+    config,
+    alive: !!buffer?.latest()?.self.alive,
+    blocked: modalsOpen() || isTypingTarget(document.activeElement),
+  }),
+  (command) => sendCommand(command),
+);
+const sandboxPanel = new SandboxPanel(sandboxCommands);
+sandboxPanel.setBindings(loadBindings());
+setupDisplaySettings((settings) => renderer.setDisplaySettings(settings));
+document.getElementById('hud-leave')!.addEventListener('click', leaveRoom);
 
 // HUD complet de jeu (stats, évolutions, classement, ping)
 const hud = new GameHud({
@@ -108,13 +126,15 @@ const input = new InputController(canvas, {
     upgradeTreeModal.setHeld(open);
   },
   bindings: loadBindings(),
+  onSandbox: (action) => sandboxCommands.run(action),
+  isBlocked: () => modalsOpen(),
 });
 
 // Connexion explicite ; les intentions du menu attendent welcome.
 const connection = new GameConnection(gameSocketUrl(location), {
   onMessage: handleMessage,
   onStateChange: (state, entering) => {
-    menu.setBusy(entering || state === 'joining');
+    menu.setBusy(entering || state === 'joining' || state === 'leaving');
     if (state === 'connecting') menu.setStatus('Connexion…');
     else if (state === 'joining') menu.setStatus('Entrée dans le salon…');
   },
@@ -134,7 +154,23 @@ function enterRoom(intent: RoomIntent): void {
 }
 
 function sendCommand(command: PlayerCommand): void {
+  if (command.type === 'sandbox' && !sandboxCommands.available) return;
   if (config && !controlsModal.isVisible) connection.send({ t: 'command', command });
+}
+
+function modalsOpen(): boolean {
+  return controlsModal.isVisible || upgradeTreeModal.isOpen();
+}
+
+function leaveRoom(): void {
+  if (!currentRoomCode) return;
+  // L’intention explicite invalide la reprise même si l’accusé est perdu sur le réseau.
+  menu.clearSession(currentRoomCode);
+  exitStatus = 'Vous avez quitté le salon. La session précédente est terminée.';
+  connection.leave();
+  resetRoom();
+  menu.showLobby();
+  menu.setStatus(exitStatus);
 }
 
 function syncInputAvailability(): void {
@@ -152,10 +188,13 @@ function resetRoom(): void {
   pingSentTimes.clear();
   input.reset();
   input.setEnabled(false);
+  sandboxCommands.reset();
+  sandboxPanel.sync(null);
   renderer.reset();
   hud.reset();
   deathScreen.hide();
   upgradeTreeModal.hide();
+  if (controlsModal.isVisible) controlsModal.hide();
   minimapContainer.hidden = true;
 }
 
@@ -179,6 +218,7 @@ function handleMessage(message: ServerMessage, rejectedIntent?: RoomIntent): voi
       // Persistance de la session pour reprise (resumeToken)
       menu.saveSession(message.code, message.resumeToken);
       menu.showRoom(message.code);
+      canvas.focus();
 
       hud.setRoomCode(message.code);
       minimapContainer.hidden = false;
@@ -275,6 +315,7 @@ function frame(now: number): void {
 
   const current = buffer?.sample(now) ?? null;
   renderer.draw(current, config, now);
+  sandboxPanel.sync(config);
 
   // Rendu de la minicarte
   if (minimapCtx) {

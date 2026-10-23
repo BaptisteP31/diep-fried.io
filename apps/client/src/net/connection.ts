@@ -11,7 +11,8 @@ const CLIENT_ID = `diep-fried-web/${import.meta.env.MODE}`;
 const REQUEST_TIMEOUT_MS = 10_000;
 
 export type RoomIntent = Extract<ClientMessage, { t: 'room.create' | 'room.join' }>;
-export type ConnectionState = 'disconnected' | 'connecting' | 'ready' | 'joining' | 'joined';
+export type ConnectionState =
+  'disconnected' | 'connecting' | 'ready' | 'joining' | 'joined' | 'leaving';
 
 /** URL de la WebSocket de jeu, sur la même origine que la page (proxy Vite en développement). */
 export function gameSocketUrl(location: Location): string {
@@ -77,7 +78,13 @@ export class GameConnection {
   }
 
   enter(intent: RoomIntent): boolean {
-    if (this.pending || this.phase === 'joined' || this.phase === 'joining') return false;
+    if (
+      this.pending ||
+      this.phase === 'joined' ||
+      this.phase === 'joining' ||
+      this.phase === 'leaving'
+    )
+      return false;
     this.pending = intent;
     if (this.phase === 'disconnected') this.connect();
     else if (this.phase === 'ready') this.flushEntry();
@@ -87,12 +94,21 @@ export class GameConnection {
 
   /** Les commandes de jeu ne sont jamais mises en attente ou rejouées. */
   send(message: ClientMessage): boolean {
+    if (message.t === 'room.leave') return this.leave();
     if (message.t === 'ping') {
       if (this.phase !== 'ready' && this.phase !== 'joined') return false;
-    } else if (this.phase !== 'joined' || !['input', 'command', 'room.leave'].includes(message.t)) {
+    } else if (this.phase !== 'joined' || !['input', 'command'].includes(message.t)) {
       return false;
     }
     return this.write(message);
+  }
+
+  /** Ferme le salon courant sans rejouer d’intention ; attend l’accusé ou le timeout. */
+  leave(): boolean {
+    if (this.phase !== 'joined' || !this.write({ t: 'room.leave' })) return false;
+    this.setState('leaving');
+    this.armTimeout();
+    return true;
   }
 
   private receive(message: ServerMessage): void {

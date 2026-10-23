@@ -1,5 +1,13 @@
-import { isModeId, normalizeRoomCode, type ModeId } from '@diep-fried/shared';
+import {
+  MODE_IDS,
+  MAX_PLAYERS_LIMIT,
+  isModeId,
+  normalizeRoomCode,
+  type ModeId,
+  type RoomOptions,
+} from '@diep-fried/shared';
 import { readStored, writeStored } from '../state/storage';
+import { modeDetails, parseRoomOptions } from './modes';
 
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
@@ -8,7 +16,7 @@ function element<T extends HTMLElement>(id: string): T {
 }
 
 export interface MenuActions {
-  create(name: string, mode: ModeId): void;
+  create(name: string, mode: ModeId, options: RoomOptions): void;
   join(name: string, code: string, resumeToken?: string): void;
   onOpenControls(): void;
 }
@@ -23,10 +31,25 @@ export class Menu {
   private readonly resumeContainer = element<HTMLDivElement>('menu-resume-container');
   private readonly resumeBtn = element<HTMLButtonElement>('menu-resume-btn');
   private readonly controlsBtn = element<HTMLButtonElement>('menu-controls-btn');
+  private busy = false;
 
   constructor(private readonly actions: MenuActions) {
     this.name.value = readStored('diep-fried:name') ?? '';
     this.code.value = new URLSearchParams(location.search).get('room') ?? '';
+    this.mode.replaceChildren(
+      ...MODE_IDS.map((id) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = modeDetails(id).label;
+        return option;
+      }),
+    );
+    const describeMode = () => {
+      element('menu-mode-rules').textContent = modeDetails(this.mode.value).rules;
+    };
+    this.mode.addEventListener('change', describeMode);
+    describeMode();
+    element<HTMLInputElement>('menu-max-players').max = String(MAX_PLAYERS_LIMIT);
 
     const getName = () => {
       const val = this.name.value.trim();
@@ -35,11 +58,23 @@ export class Menu {
     };
 
     element('menu-create').addEventListener('click', () => {
-      if (isModeId(this.mode.value)) actions.create(getName(), this.mode.value);
+      if (this.busy || !isModeId(this.mode.value)) return;
+      try {
+        const options = parseRoomOptions(
+          element<HTMLInputElement>('menu-max-players').value,
+          element<HTMLSelectElement>('menu-arena-size').value,
+          element<HTMLSelectElement>('menu-shape-density').value,
+        );
+        actions.create(getName(), this.mode.value, options);
+      } catch (error) {
+        this.setStatus((error as Error).message);
+        element('menu-max-players').focus();
+      }
     });
 
     this.form.addEventListener('submit', (event) => {
       event.preventDefault();
+      if (this.busy) return;
       const roomCode = normalizeRoomCode(this.code.value);
       const savedToken = roomCode
         ? (readStored(`diep-fried:resume:${roomCode}`) ?? undefined)
@@ -48,6 +83,7 @@ export class Menu {
     });
 
     element('menu-join-new').addEventListener('click', () => {
+      if (this.busy) return;
       const code = normalizeRoomCode(this.code.value);
       this.clearSession(code);
       actions.join(getName(), code);
@@ -58,6 +94,7 @@ export class Menu {
     });
 
     this.resumeBtn.addEventListener('click', () => {
+      if (this.busy) return;
       const lastRoom = readStored('diep-fried:lastRoom');
       if (!lastRoom) return;
       const token = readStored(`diep-fried:resume:${lastRoom}`) ?? undefined;
@@ -78,12 +115,16 @@ export class Menu {
   }
 
   setBusy(busy: boolean): void {
+    this.busy = busy;
     for (const id of ['menu-create', 'menu-join', 'menu-join-new', 'menu-resume-btn']) {
       element<HTMLButtonElement>(id).disabled = busy;
     }
   }
 
   showLobby(): void {
+    const url = new URL(location.href);
+    url.searchParams.delete('room');
+    history.replaceState(null, '', url);
     this.form.hidden = false;
     this.checkResumeAvailability();
   }

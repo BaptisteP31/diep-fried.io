@@ -54,6 +54,25 @@ function harness() {
 afterEach(() => vi.useRealTimers());
 
 describe('cycle réseau client', () => {
+  it('attend room.left avant une autre entrée et borne un départ sans réponse', () => {
+    const { sockets, connection, onClose } = harness();
+    connection.enter(create);
+    const socket = sockets[0]!;
+    socket.open();
+    socket.receive(welcome);
+    socket.receive(joined);
+    expect(connection.leave()).toBe(true);
+    expect(connection.state).toBe('leaving');
+    expect(connection.leave()).toBe(false);
+    expect(connection.enter(resume)).toBe(false);
+    expect(connection.send({ t: 'command', command: { type: 'sandbox', action: 'levelUp' } })).toBe(
+      false,
+    );
+    vi.advanceTimersByTime(10_000);
+    expect(connection.state).toBe('disconnected');
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(socket.sent.filter((message) => message.t === 'room.leave')).toHaveLength(1);
+  });
   it('signale une erreur réseau une seule fois et permet un nouvel essai explicite', () => {
     const { sockets, connection, onClose } = harness();
     connection.enter(create);

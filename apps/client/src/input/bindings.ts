@@ -1,4 +1,5 @@
 import { STAT_IDS, type StatId, type Vec2 } from '@diep-fried/shared';
+import type { SandboxAction } from './sandbox';
 
 /**
  * Actions du clavier, associées par `KeyboardEvent.code` (position physique de la touche).
@@ -9,6 +10,7 @@ export type ToggleAction = 'autoFire' | 'autoSpin' | 'upgradeTree';
 export type KeyAction =
   | { kind: 'held'; action: HeldAction }
   | { kind: 'toggle'; action: ToggleAction }
+  | { kind: 'sandbox'; action: SandboxAction }
   | { kind: 'stat'; stat: StatId };
 
 export type KeyBindings = Record<string, KeyAction>;
@@ -31,6 +33,10 @@ export const DEFAULT_BINDINGS: Readonly<Record<string, KeyAction>> = {
   KeyE: toggle('autoFire'),
   KeyC: toggle('autoSpin'),
   KeyY: toggle('upgradeTree'),
+  KeyK: { kind: 'sandbox', action: 'levelUp' },
+  Backslash: { kind: 'sandbox', action: 'cycleClass' },
+  KeyO: { kind: 'sandbox', action: 'selfDestruct' },
+  Semicolon: { kind: 'sandbox', action: 'toggleGod' },
   ...Object.fromEntries(
     STAT_IDS.map((stat, index) => [`Digit${index + 1}`, { kind: 'stat', stat } as KeyAction]),
   ),
@@ -110,6 +116,8 @@ function isKeyAction(value: unknown): value is KeyAction {
     return ['up', 'down', 'left', 'right', 'fire', 'alt'].includes(String(action.action));
   if (action.kind === 'toggle')
     return ['autoFire', 'autoSpin', 'upgradeTree'].includes(String(action.action));
+  if (action.kind === 'sandbox')
+    return ['levelUp', 'cycleClass', 'selfDestruct', 'toggleGod'].includes(String(action.action));
   return action.kind === 'stat' && STAT_IDS.includes(action.stat as StatId);
 }
 
@@ -152,6 +160,10 @@ export function formatKeyCode(code: string): string {
   }
   if (code.startsWith('Digit')) return code.slice(5);
   switch (code) {
+    case 'Backslash':
+      return '\\ (position physique)';
+    case 'Semicolon':
+      return '; (position physique)';
     case 'Space':
       return 'Espace';
     case 'ArrowUp':

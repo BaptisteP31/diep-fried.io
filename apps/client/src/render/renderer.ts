@@ -15,6 +15,7 @@ import { FadeTracker } from './fade-tracker';
 import { PALETTE, SHAPE_COLORS, SHINY_COLOR, TEAM_COLORS } from './palette';
 import { calculateBarrelRecoil, calculateRecoilOffset } from './recoil';
 import type { RenderFrame } from '../state/snapshot-buffer';
+import type { DisplaySettings } from '../state/display-settings';
 
 /** Espacement de la grille en unités monde (choix diep-fried.io). */
 const GRID_SPACING = 25;
@@ -44,6 +45,7 @@ export class Renderer {
   private readonly ctx: CanvasRenderingContext2D;
   private width = 0;
   private height = 0;
+  private settings: DisplaySettings = { grid: true, maxDpr: 2 };
   /** Dernière caméra utilisée, pour convertir la position de la souris. */
   camera: Camera | null = null;
   /** Suivi du fondu pour les entités disparaissant de l'affichage. */
@@ -60,9 +62,14 @@ export class Renderer {
     this.fadeTracker.clear();
   }
 
+  setDisplaySettings(settings: DisplaySettings): void {
+    this.settings = settings;
+    this.resize();
+  }
+
   /** Ajuste la résolution du canvas à sa taille affichée et à la densité de pixels. */
   resize(): void {
-    const ratio = window.devicePixelRatio || 1;
+    const ratio = Math.min(this.settings.maxDpr, window.devicePixelRatio || 1);
     const rect = this.canvas.getBoundingClientRect();
     this.width = rect.width;
     this.height = rect.height;
@@ -94,7 +101,7 @@ export class Renderer {
     this.camera = camera;
 
     if (config) this.drawOutsideArena(camera, config);
-    this.drawGrid(camera);
+    if (this.settings.grid) this.drawGrid(camera);
     if (config) drawWorldMap(ctx, camera, config);
     if (!frame) {
       this.fadeTracker.clear();
