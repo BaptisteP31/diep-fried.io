@@ -70,8 +70,12 @@ export function createGameServer(
 
   http.on('upgrade', (req, socket, head) => {
     socket.on('error', () => socket.destroy());
-    const reject = (status: string) =>
+    // Détruire après écriture : sinon un client qui ne ferme pas son côté garde la socket
+    // ouverte indéfiniment et bloque `http.close()`.
+    const reject = (status: string) => {
+      socket.once('finish', () => socket.destroy());
       socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    };
     if (closing) {
       reject('503 Service Unavailable');
       return;

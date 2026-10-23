@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { createConnection, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -16,9 +17,11 @@ import { createGameServer, type GameServer } from '../src/server';
 
 let server: GameServer | null = null;
 const sockets: WebSocket[] = [];
+const rawSockets: Socket[] = [];
 
 afterEach(async () => {
   for (const socket of sockets.splice(0)) socket.terminate();
+  for (const socket of rawSockets.splice(0)) socket.destroy();
   await server?.close();
   server = null;
 });
@@ -434,6 +437,33 @@ describe('Protections de transport', () => {
     expect(await health(host)).toMatchObject({
       network: { connections: 1, rejectedConnections: 1 },
     });
+  });
+
+  it('libère les sockets d’upgrade refusés même si le client ne ferme pas son côté', async () => {
+    const host = await start({ maxConnectionsPerIp: 1, shutdownTimeoutMs: 60 });
+    await TestClient.connect(host);
+    const [hostname, port] = host.split(':');
+    const raw = createConnection({ host: hostname, port: Number(port), allowHalfOpen: true });
+    rawSockets.push(raw);
+    let response = '';
+    raw.setEncoding('utf8').on('data', (chunk) => (response += chunk));
+    await new Promise((resolve) => raw.once('connect', resolve));
+    raw.write(
+      'GET /ws HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
+        'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n',
+    );
+    await new Promise((resolve) => raw.once('end', resolve));
+    expect(response).toMatch(/^HTTP\/1\.1 429 /);
+    const connections = () =>
+      new Promise<number>((resolve) => server!.http.getConnections((_e, n) => resolve(n)));
+    const deadline = Date.now() + 1000;
+    while ((await connections()) > 1 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(await connections()).toBe(1);
+    const started = performance.now();
+    await server!.close();
+    expect(performance.now() - started).toBeLessThan(800);
   });
 
   it('limite tous les messages, y compris invalides et avant hello', async () => {
