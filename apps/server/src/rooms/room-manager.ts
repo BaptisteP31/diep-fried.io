@@ -12,6 +12,7 @@ import { Room } from './room';
 
 export class RoomManager {
   private readonly rooms = new Map<RoomCode, Room>();
+  private retiredDroppedMs = 0;
   private readonly sweeper: NodeJS.Timeout;
 
   constructor(
@@ -19,6 +20,7 @@ export class RoomManager {
       maxRooms: number;
       emptyRoomTtlMs: number;
       simulationFactory: SimulationFactory;
+      resumeGraceMs: number;
     },
   ) {
     this.sweeper = setInterval(() => this.closeExpiredRooms(), 5_000);
@@ -27,6 +29,12 @@ export class RoomManager {
 
   get roomCount(): number {
     return this.rooms.size;
+  }
+
+  get totalDroppedMs(): number {
+    let total = this.retiredDroppedMs;
+    for (const room of this.rooms.values()) total += room.totalDroppedMs;
+    return total;
   }
 
   get playerCount(): number {
@@ -44,6 +52,7 @@ export class RoomManager {
       resolveModeConfig(mode, options),
       this.options.simulationFactory,
       randomInt(2 ** 32),
+      this.options.resumeGraceMs,
     );
     this.rooms.set(code, room);
     room.start();
@@ -55,7 +64,10 @@ export class RoomManager {
   }
 
   closeAll(): void {
-    for (const room of this.rooms.values()) room.stop();
+    for (const room of this.rooms.values()) {
+      room.stop();
+      this.retiredDroppedMs += room.totalDroppedMs;
+    }
     this.rooms.clear();
     clearInterval(this.sweeper);
   }
@@ -65,6 +77,7 @@ export class RoomManager {
     for (const [code, room] of this.rooms) {
       if (room.emptySince !== null && now - room.emptySince >= this.options.emptyRoomTtlMs) {
         room.stop();
+        this.retiredDroppedMs += room.totalDroppedMs;
         this.rooms.delete(code);
       }
     }
