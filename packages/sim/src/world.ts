@@ -766,7 +766,7 @@ class World implements Simulation {
         if (distance > 1) body.angle = Math.atan2(dy, dx);
         if (body.family === 'minion') {
           const firing = target ?? (input?.fire && !input.alt ? { x, y } : undefined);
-          if (firing) {
+          if (firing && !this.protectedDrone(body)) {
             body.angle = Math.atan2(firing.y - body.y, firing.x - body.x);
             this.secondary(body, player, body.angle, [0]);
           } else body.secondaryActive = false;
@@ -1135,8 +1135,8 @@ class World implements Simulation {
   private canDamage(a: Body, b: Body): boolean {
     if ((a.kind === 'tank' && a.spawnProtected) || (b.kind === 'tank' && b.spawnProtected))
       return false;
-    // Produire des drones ne révèle pas Manager ; leurs attaques attendent la fin
-    // de protection ou une intention offensive explicite du propriétaire.
+    // Produire des drones ne révèle pas Manager ; spawn/god interdisent leurs
+    // échanges de dégâts, mais la protection de base dépend de l'unité elle-même.
     if (this.protectedDrone(a) || this.protectedDrone(b)) return false;
     if (a.kind === 'projectile' && b.kind === 'tank' && a.ownerPlayerId === b.playerId)
       return false;
@@ -1150,8 +1150,10 @@ class World implements Simulation {
 
   private protectedDrone(body: Body): boolean {
     if (body.kind !== 'projectile' || !this.controlled(body)) return false;
-    const owner = this.players.get(body.ownerPlayerId)?.tank;
-    return owner?.id === body.ownerId && owner.spawnProtected;
+    const player = this.players.get(body.ownerPlayerId);
+    const owner = player?.tank;
+    if (!player || !owner || owner.id !== body.ownerId) return false;
+    return this.inOwnBase(body) || this.tick < owner.protectedUntil || player.god;
   }
 
   private hitProjectile(bullet: Projectile, target: Body, time: number): void {
@@ -1395,7 +1397,13 @@ class World implements Simulation {
     const entities: EntityState[] = [];
     const x = (player.tank?.x ?? player.x) + (player.tank?.cameraOffset?.x ?? 0);
     const y = (player.tank?.y ?? player.y) + (player.tank?.cameraOffset?.y ?? 0);
+    const hiddenEnemy = (body: Body | undefined): boolean =>
+      body?.kind === 'tank' &&
+      body.opacity === 0 &&
+      body.playerId !== playerId &&
+      (body.team === NEUTRAL_TEAM || body.team !== player.team);
     for (const body of this.bodies.values()) {
+      if (hiddenEnemy(body)) continue;
       const extent = view + B.viewMargin + body.radius;
       if (Math.abs(body.x - x) > extent || Math.abs(body.y - y) > extent) continue;
       const base = {
@@ -1444,7 +1452,8 @@ class World implements Simulation {
           ...(body.bodyShape ? { bodyShape: body.bodyShape } : {}),
           ...(body.classId ? { classId: body.classId } : {}),
           ...(body.barrelShots ? { barrelShots: [...body.barrelShots] } : {}),
-          ownerId: body.ownerId,
+          // 0 ne désigne aucun corps : ne pas divulguer le tank masqué via ses drones.
+          ownerId: hiddenEnemy(this.bodies.get(body.ownerId)) ? 0 : body.ownerId,
           health: body.health,
           maxHealth: body.maxHealth,
         });
