@@ -33,6 +33,14 @@
       >
         [C] Rotation auto
       </button>
+      <button
+        id="hud-tree-btn"
+        class="hud-toggle-badge"
+        type="button"
+        title="Arbre des évolutions (Maintenir Y)"
+      >
+        [Y] Évolutions
+      </button>
       <button id="hud-controls-btn" type="button" title="Configurer les touches">Touches</button>
     </div>
 
@@ -106,7 +114,15 @@
       </button>
 
       <p id="menu-status" role="status"></p>
-      <a href="/licenses/THIRD_PARTY_NOTICES.txt" target="_blank">Licences</a>
+      <div class="menu-licenses">
+        <a href="/licenses/AGPL-3.0.txt" target="_blank" rel="noopener">Licence AGPL-3.0</a>
+        <span class="sep">•</span>
+        <a href="https://github.com/diep-fried/diep-fried.io" target="_blank" rel="noopener"
+          >Code source</a
+        >
+        <span class="sep">•</span>
+        <a href="/licenses/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noopener">Avis tiers</a>
+      </div>
     </form>
 
     <!-- Écran de mort -->
@@ -138,6 +154,30 @@
           </button>
           <button id="controls-close" type="button">Fermer</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal de l'arbre d'évolution complet (54 classes) -->
+    <div
+      id="upgrade-tree-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upgrade-tree-title"
+      hidden
+    >
+      <div class="upgrade-tree-container">
+        <div class="upgrade-tree-header">
+          <div>
+            <h2 id="upgrade-tree-title">Arbre d'évolution (54 classes)</h2>
+            <p class="upgrade-tree-subtitle">
+              Maintenez la touche [Y] en partie ou cliquez pour explorer les paliers.
+            </p>
+          </div>
+          <button id="upgrade-tree-close" type="button" class="tree-close-btn" aria-label="Fermer">
+            ×
+          </button>
+        </div>
+        <div id="upgrade-tree-content"></div>
       </div>
     </div>
 

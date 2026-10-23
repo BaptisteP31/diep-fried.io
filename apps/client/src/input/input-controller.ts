@@ -8,6 +8,7 @@ const AUTO_SPIN_RADIUS = 300;
 export interface InputControllerOptions {
   onStat?: (stat: StatId) => void;
   onToggle?: (action: 'autoFire' | 'autoSpin', enabled: boolean) => void;
+  onUpgradeTree?: (open: boolean) => void;
   bindings?: KeyBindings;
 }
 
@@ -27,6 +28,7 @@ export class InputController {
   private readonly onStat: (stat: StatId) => void;
   private readonly onToggle:
     ((action: 'autoFire' | 'autoSpin', enabled: boolean) => void) | undefined;
+  private readonly onUpgradeTree: ((open: boolean) => void) | undefined;
 
   constructor(
     target: HTMLElement,
@@ -36,10 +38,12 @@ export class InputController {
     if (typeof onStatOrOptions === 'function') {
       this.onStat = onStatOrOptions;
       this.onToggle = undefined;
+      this.onUpgradeTree = undefined;
       this.bindings = bindingsArg ?? loadBindings();
     } else {
       this.onStat = onStatOrOptions.onStat ?? (() => {});
       this.onToggle = onStatOrOptions.onToggle;
+      this.onUpgradeTree = onStatOrOptions.onUpgradeTree;
       this.bindings = onStatOrOptions.bindings ?? bindingsArg ?? loadBindings();
     }
 
@@ -76,6 +80,7 @@ export class InputController {
     if (resetSequence) this.seq = 0;
     this.onToggle?.('autoFire', false);
     this.onToggle?.('autoSpin', false);
+    this.onUpgradeTree?.(false);
   }
 
   acknowledgeSequence(seq: number): void {
@@ -149,6 +154,16 @@ export class InputController {
     }
     if (!action) return;
     event.preventDefault();
+
+    if (action.kind === 'toggle' && action.action === 'upgradeTree') {
+      if (down) {
+        if (!event.repeat) this.onUpgradeTree?.(true);
+      } else {
+        this.onUpgradeTree?.(false);
+      }
+      return;
+    }
+
     if (action.kind === 'held') {
       if (down) this.held.add(action.action);
       else this.held.delete(action.action);
@@ -162,7 +177,6 @@ export class InputController {
     } else if (action.action === 'autoSpin') {
       this.toggleAutoSpin();
     }
-    // `upgradeTree` : réservé à l'interface de l'arbre d'évolution.
   }
 
   private onButton(button: number, down: boolean): void {

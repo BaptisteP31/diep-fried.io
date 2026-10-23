@@ -19,3 +19,10 @@ export function worldToScreen(camera: Camera, point: Vec2): Vec2 {
     y: (point.y - camera.center.y) * camera.scale + camera.viewport.height / 2,
   };
 }
+
+export function screenToWorld(camera: Camera, point: Vec2): Vec2 {
+  return {
+    x: (point.x - camera.viewport.width / 2) / camera.scale + camera.center.x,
+    y: (point.y - camera.viewport.height / 2) / camera.scale + camera.center.y,
+  };
+}

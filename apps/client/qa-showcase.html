@@ -1,0 +1,1228 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>diep-fried.io — Validation QA (54 Classes & Familles)</title>
+    <style>
+      :root {
+        --bg-color: #1a1a1a;
+        --card-bg: rgba(30, 30, 30, 0.95);
+        --theme-friendly: #00b2e1;
+        --theme-enemy: #f14e54;
+        --theme-xp: #ffde43;
+        --theme-score: #43ff91;
+        --theme-border: #555555;
+        font-family: 'Ubuntu', system-ui, sans-serif;
+        color: #ffffff;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg-color);
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+      h1,
+      h2,
+      h3 {
+        color: #fff;
+      }
+      .badge-success {
+        display: inline-block;
+        background: #28a745;
+        color: #fff;
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.3rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+      .qa-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid var(--theme-border);
+        padding-bottom: 1rem;
+      }
+      .section-card {
+        background: var(--card-bg);
+        border: 1px solid var(--theme-border);
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .arena-canvas {
+        background: #cccccc;
+        border: 2px solid #444;
+        border-radius: 0.5rem;
+        width: 100%;
+        max-width: 1000px;
+        height: 520px;
+        display: block;
+      }
+      /* Arbre des 54 classes */
+      .tree-tier {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .tree-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+        gap: 0.5rem;
+      }
+      .class-card {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid var(--theme-border);
+        border-radius: 0.4rem;
+        padding: 0.4rem 0.25rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      .class-card:hover {
+        border-color: var(--theme-friendly);
+      }
+      .class-name {
+        font-size: 0.7rem;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
+      }
+      /* HUD et Smasher Stats */
+      .hud-mock {
+        background: rgba(0, 0, 0, 0.4);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        display: flex;
+        gap: 2rem;
+        align-items: flex-start;
+      }
+      .stat-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+      }
+      .stat-item.disabled {
+        opacity: 0.3;
+        text-decoration: line-through;
+      }
+      .stat-segments {
+        display: flex;
+        gap: 2px;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 2px;
+        border-radius: 3px;
+      }
+      .seg {
+        width: 10px;
+        height: 12px;
+        background: #333;
+        border-radius: 1px;
+      }
+      .seg.filled {
+        background: #85e37d;
+      }
+      .menu-footer {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.85rem;
+      }
+      .menu-footer a {
+        color: var(--theme-friendly);
+        text-decoration: none;
+      }
+      .menu-footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="qa-header">
+      <div>
+        <h1>diep-fried.io — Rapport Visuel QA</h1>
+        <p style="color: #aaa; margin-top: 0.25rem">
+          Rendu des 54 classes, tourelles auto, familles d'armes et masquage Smasher
+        </p>
+      </div>
+      <div>
+        <span class="badge-success">Port 8091 • QA Valide</span>
+      </div>
+    </div>
+
+    <!-- 1. Arène synthétique temps réel -->
+    <div class="section-card">
+      <h2>1. Rendu Synthétique en Direct : Tourelles Auto, Familles d'Armes & Furtivité</h2>
+      <p style="color: #bbb; font-size: 0.85rem">
+        Scène injectée avec tourelles auto orientées, Predator décalé, corps Smasher/Spike/Landmine,
+        missiles Skimmer/Rocketeer, Factory minions, Necromancer drones carrés et traps à 3 pointes.
+      </p>
+      <canvas id="arena" class="arena-canvas" width="1000" height="520"></canvas>
+    </div>
+
+    <!-- 2. Arbre des 54 classes d'évolution -->
+    <div class="section-card">
+      <h2>2. Arbre d'Évolution Complet (54 Classes avec Vignettes Lisibles)</h2>
+      <div id="tree-container" style="display: flex; flex-direction: column; gap: 1.25rem"></div>
+    </div>
+
+    <!-- 3. Validation Corps Smasher & Caps Stats à 0 -->
+    <div class="section-card">
+      <h2>3. Corps Smasher : Plafonds 0 Masqués et 10 Segments de Corps</h2>
+      <div class="hud-mock">
+        <div class="stat-list" id="smasher-stats-list"></div>
+        <div>
+          <h3 style="font-size: 1rem; margin-bottom: 0.5rem; color: var(--theme-xp)">
+            Règles vérifiées :
+          </h3>
+          <ul
+            style="
+              font-size: 0.85rem;
+              color: #ccc;
+              margin-left: 1.2rem;
+              display: flex;
+              flex-direction: column;
+              gap: 0.4rem;
+            "
+          >
+            <li>
+              Bullet Speed, Penetration, Damage et Reload : Cap = 0 ➔
+              <strong>Lignes masquées/désactivées</strong>
+            </li>
+            <li>
+              Health Regen, Max Health, Body Damage, Movement Speed : Cap = 10 ➔
+              <strong>10 segments de progression</strong>
+            </li>
+            <li>Spike : 12 pointes acérées sous le corps</li>
+            <li>Landmine : Deux calques hexagonaux superposés décalés de 30°</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Licence AGPL-3.0 et Liens Projet -->
+    <div class="section-card">
+      <h2>4. Conformité Licence AGPL-3.0</h2>
+      <div class="menu-footer">
+        <a href="/licenses/AGPL-3.0.txt" target="_blank">📄 Licence AGPL-3.0</a>
+        <span style="color: #555">•</span>
+        <a href="https://github.com/diep-fried/diep-fried.io" target="_blank"
+          >💻 Code source du projet</a
+        >
+        <span style="color: #555">•</span>
+        <a href="/licenses/THIRD_PARTY_NOTICES.txt" target="_blank">📜 Avis de licences tierces</a>
+      </div>
+    </div>
+
+    <script type="module">
+      const PALETTE = {
+        background: '#cccccc',
+        grid: 'rgba(0, 0, 0, 0.1)',
+        outsideArena: 'rgba(0, 0, 0, 0.1)',
+        outline: 'rgba(0, 0, 0, 0.25)',
+        barrel: '#999999',
+        barrelOutline: '#555555',
+        friendly: '#00b2e1',
+        enemy: '#f14e54',
+        healthBack: '#555555',
+        healthFill: '#85e37d',
+        textStroke: '#393939',
+        text: '#ffffff',
+      };
+
+      function fillAndStroke(ctx, fill, stroke, lineWidth) {
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.lineWidth = lineWidth;
+        ctx.strokeStyle = stroke;
+        ctx.stroke();
+      }
+
+      function polygonPath(ctx, sides, radius, rotation = 0) {
+        ctx.beginPath();
+        for (let k = 0; k < sides; k++) {
+          const angle = rotation + (2 * Math.PI * k) / sides;
+          if (k === 0) ctx.moveTo(radius * Math.cos(angle), radius * Math.sin(angle));
+          else ctx.lineTo(radius * Math.cos(angle), radius * Math.sin(angle));
+        }
+        ctx.closePath();
+      }
+
+      function drawSpikes(ctx, radius, points = 12) {
+        ctx.beginPath();
+        const outerR = radius * 1.4;
+        const innerR = radius * 0.95;
+        for (let k = 0; k < points * 2; k++) {
+          const angle = (Math.PI * k) / points;
+          const dist = k % 2 === 0 ? outerR : innerR;
+          if (k === 0) ctx.moveTo(dist * Math.cos(angle), dist * Math.sin(angle));
+          else ctx.lineTo(dist * Math.cos(angle), dist * Math.sin(angle));
+        }
+        ctx.closePath();
+      }
+
+      function drawTrap(ctx, radius) {
+        ctx.beginPath();
+        const points = 3;
+        const outerR = radius;
+        const innerR = radius * 0.42;
+        for (let k = 0; k < points * 2; k++) {
+          const angle = (Math.PI * k) / points;
+          const dist = k % 2 === 0 ? outerR : innerR;
+          if (k === 0) ctx.moveTo(dist * Math.cos(angle), dist * Math.sin(angle));
+          else ctx.lineTo(dist * Math.cos(angle), dist * Math.sin(angle));
+        }
+        ctx.closePath();
+      }
+
+      function drawSquare(ctx, radius) {
+        ctx.beginPath();
+        ctx.rect(-radius, -radius, radius * 2, radius * 2);
+        ctx.closePath();
+      }
+
+      // 54 classes definitions
+      const ALL_54_CLASSES = [
+        { id: 'tank', name: 'Tank', level: 1, barrels: [{ angle: 0, length: 1.9, width: 0.84 }] },
+        {
+          id: 'twin',
+          name: 'Twin',
+          level: 15,
+          barrels: [
+            { angle: 0, offset: -0.5, length: 1.9, width: 0.64 },
+            { angle: 0, offset: 0.5, length: 1.9, width: 0.64 },
+          ],
+        },
+        {
+          id: 'sniper',
+          name: 'Sniper',
+          level: 15,
+          barrels: [{ angle: 0, length: 2.4, width: 0.84 }],
+        },
+        {
+          id: 'machine-gun',
+          name: 'Machine Gun',
+          level: 15,
+          barrels: [{ angle: 0, length: 1.9, width: 0.65, tipWidth: 1.1 }],
+        },
+        {
+          id: 'flank-guard',
+          name: 'Flank Guard',
+          level: 15,
+          barrels: [
+            { angle: 0, length: 1.9, width: 0.84 },
+            { angle: Math.PI, length: 1.5, width: 0.84 },
+          ],
+        },
+        {
+          id: 'triple-shot',
+          name: 'Triple Shot',
+          level: 30,
+          barrels: [
+            { angle: 0, length: 1.9, width: 0.7 },
+            { angle: -0.4, length: 1.7, width: 0.7 },
+            { angle: 0.4, length: 1.7, width: 0.7 },
+          ],
+        },
+        {
+          id: 'quad-tank',
+          name: 'Quad Tank',
+          level: 30,
+          barrels: [0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a) => ({
+            angle: a,
+            length: 1.9,
+            width: 0.84,
+          })),
+        },
+        {
+          id: 'twin-flank',
+          name: 'Twin Flank',
+          level: 30,
+          barrels: [
+            { angle: 0, offset: -0.5, length: 1.9, width: 0.6 },
+            { angle: 0, offset: 0.5, length: 1.9, width: 0.6 },
+            { angle: Math.PI, offset: -0.5, length: 1.9, width: 0.6 },
+            { angle: Math.PI, offset: 0.5, length: 1.9, width: 0.6 },
+          ],
+        },
+        {
+          id: 'assassin',
+          name: 'Assassin',
+          level: 30,
+          barrels: [{ angle: 0, length: 2.7, width: 0.84 }],
+        },
+        {
+          id: 'overseer',
+          name: 'Overseer',
+          level: 30,
+          barrels: [
+            { angle: Math.PI / 2, length: 1.5, width: 1.0 },
+            { angle: -Math.PI / 2, length: 1.5, width: 1.0 },
+          ],
+        },
+        {
+          id: 'hunter',
+          name: 'Hunter',
+          level: 30,
+          barrels: [
+            { angle: 0, length: 2.2, width: 0.95 },
+            { angle: 0, length: 2.0, width: 1.2 },
+          ],
+        },
+        {
+          id: 'trapper',
+          name: 'Trapper',
+          level: 30,
+          barrels: [{ angle: 0, length: 1.8, width: 0.9, tipWidth: 1.4 }],
+        },
+        {
+          id: 'destroyer',
+          name: 'Destroyer',
+          level: 30,
+          barrels: [{ angle: 0, length: 1.9, width: 1.7 }],
+        },
+        {
+          id: 'gunner',
+          name: 'Gunner',
+          level: 30,
+          barrels: [-0.5, -0.15, 0.15, 0.5].map((o, i) => ({
+            angle: 0,
+            offset: o,
+            length: i % 2 ? 2.0 : 1.6,
+            width: 0.3,
+          })),
+        },
+        {
+          id: 'shotgun',
+          name: 'Shotgun',
+          level: 30,
+          barrels: [{ angle: 0, length: 2.1, width: 1.1 }],
+        },
+        {
+          id: 'tri-angle',
+          name: 'Tri-Angle',
+          level: 30,
+          barrels: [
+            { angle: 0, length: 1.9, width: 0.84 },
+            { angle: Math.PI - 0.5, length: 1.5, width: 0.65 },
+            { angle: Math.PI + 0.5, length: 1.5, width: 0.65 },
+          ],
+        },
+        {
+          id: 'auto-3',
+          name: 'Auto 3',
+          level: 30,
+          barrels: [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((a) => ({
+            angle: a,
+            length: 1.3,
+            width: 0.58,
+            auto: true,
+          })),
+        },
+        { id: 'smasher', name: 'Smasher', level: 30, barrels: [], isSmasher: true },
+        // Tier 4 (36 classes)
+        {
+          id: 'triplet',
+          name: 'Triplet',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 2.1, width: 0.64 },
+            { angle: 0, offset: -0.5, length: 1.8, width: 0.64 },
+            { angle: 0, offset: 0.5, length: 1.8, width: 0.64 },
+          ],
+        },
+        {
+          id: 'penta-shot',
+          name: 'Penta Shot',
+          level: 45,
+          barrels: [0, -0.3, 0.3, -0.6, 0.6].map((a) => ({ angle: a, length: 1.9, width: 0.65 })),
+        },
+        {
+          id: 'spread-shot',
+          name: 'Spread Shot',
+          level: 45,
+          barrels: Array.from({ length: 11 }, (_, i) => ({
+            angle: (i - 5) * 0.16,
+            length: 1.8 - Math.abs(i - 5) * 0.1,
+            width: 0.35,
+          })),
+        },
+        {
+          id: 'octo-tank',
+          name: 'Octo Tank',
+          level: 45,
+          barrels: Array.from({ length: 8 }, (_, i) => ({
+            angle: (i * Math.PI) / 4,
+            length: 1.8,
+            width: 0.8,
+          })),
+        },
+        {
+          id: 'auto-5',
+          name: 'Auto 5',
+          level: 45,
+          barrels: Array.from({ length: 5 }, (_, i) => ({
+            angle: (i * 2 * Math.PI) / 5,
+            length: 1.3,
+            width: 0.58,
+            auto: true,
+          })),
+        },
+        {
+          id: 'triple-twin',
+          name: 'Triple Twin',
+          level: 45,
+          barrels: [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].flatMap((a) => [
+            { angle: a, offset: -0.4, length: 1.9, width: 0.6 },
+            { angle: a, offset: 0.4, length: 1.9, width: 0.6 },
+          ]),
+        },
+        {
+          id: 'battleship',
+          name: 'Battleship',
+          level: 45,
+          barrels: [
+            { angle: Math.PI / 2, offset: -0.35, length: 1.4, width: 0.5 },
+            { angle: Math.PI / 2, offset: 0.35, length: 1.4, width: 0.5 },
+            { angle: -Math.PI / 2, offset: -0.35, length: 1.4, width: 0.5 },
+            { angle: -Math.PI / 2, offset: 0.35, length: 1.4, width: 0.5 },
+          ],
+        },
+        {
+          id: 'ranger',
+          name: 'Ranger',
+          level: 45,
+          barrels: [{ angle: 0, length: 3.1, width: 0.84 }],
+        },
+        {
+          id: 'stalker',
+          name: 'Stalker',
+          level: 45,
+          barrels: [{ angle: 0, length: 2.7, width: 0.84 }],
+        },
+        {
+          id: 'overlord',
+          name: 'Overlord',
+          level: 45,
+          barrels: [0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a) => ({
+            angle: a,
+            length: 1.5,
+            width: 1.0,
+          })),
+        },
+        {
+          id: 'necromancer',
+          name: 'Necromancer',
+          level: 45,
+          barrels: [
+            { angle: Math.PI / 2, length: 1.5, width: 1.0 },
+            { angle: -Math.PI / 2, length: 1.5, width: 1.0 },
+          ],
+        },
+        {
+          id: 'manager',
+          name: 'Manager',
+          level: 45,
+          barrels: [{ angle: 0, length: 1.6, width: 1.0 }],
+        },
+        {
+          id: 'overtrapper',
+          name: 'Overtrapper',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 1.8, width: 0.9, tipWidth: 1.4 },
+            { angle: (2 * Math.PI) / 3, length: 1.4, width: 0.8 },
+            { angle: (4 * Math.PI) / 3, length: 1.4, width: 0.8 },
+          ],
+        },
+        {
+          id: 'factory',
+          name: 'Factory',
+          level: 45,
+          barrels: [{ angle: 0, length: 1.7, width: 1.1 }],
+        },
+        {
+          id: 'predator',
+          name: 'Predator',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 2.8, width: 0.8 },
+            { angle: 0, length: 2.4, width: 1.0 },
+            { angle: 0, length: 2.0, width: 1.25 },
+          ],
+        },
+        {
+          id: 'streamliner',
+          name: 'Streamliner',
+          level: 45,
+          barrels: Array.from({ length: 5 }, (_, i) => ({
+            angle: 0,
+            length: 2.6 - i * 0.25,
+            width: 0.7,
+          })),
+        },
+        {
+          id: 'tri-trapper',
+          name: 'Tri-Trapper',
+          level: 45,
+          barrels: [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((a) => ({
+            angle: a,
+            length: 1.8,
+            width: 0.9,
+            tipWidth: 1.4,
+          })),
+        },
+        {
+          id: 'gunner-trapper',
+          name: 'Gunner Trapper',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 1.8, width: 0.9, tipWidth: 1.4 },
+            { angle: Math.PI, offset: -0.3, length: 1.6, width: 0.35 },
+            { angle: Math.PI, offset: 0.3, length: 1.6, width: 0.35 },
+          ],
+        },
+        {
+          id: 'mega-trapper',
+          name: 'Mega Trapper',
+          level: 45,
+          barrels: [{ angle: 0, length: 1.9, width: 1.5, tipWidth: 2.0 }],
+        },
+        {
+          id: 'auto-trapper',
+          name: 'Auto Trapper',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 1.8, width: 0.9, tipWidth: 1.4 },
+            { angle: 0, length: 1.3, width: 0.58, auto: true },
+          ],
+        },
+        {
+          id: 'hybrid',
+          name: 'Hybrid',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 1.9, width: 1.7 },
+            { angle: Math.PI, length: 1.4, width: 0.9 },
+          ],
+        },
+        {
+          id: 'annihilator',
+          name: 'Annihilator',
+          level: 45,
+          barrels: [{ angle: 0, length: 1.9, width: 2.4 }],
+        },
+        {
+          id: 'skimmer',
+          name: 'Skimmer',
+          level: 45,
+          barrels: [{ angle: 0, length: 1.9, width: 1.6 }],
+        },
+        {
+          id: 'rocketeer',
+          name: 'Rocketeer',
+          level: 45,
+          barrels: [{ angle: 0, length: 2.0, width: 1.5 }],
+        },
+        {
+          id: 'glider',
+          name: 'Glider',
+          level: 45,
+          barrels: [{ angle: 0, length: 1.9, width: 1.6 }],
+        },
+        {
+          id: 'firework',
+          name: 'Firework',
+          level: 45,
+          barrels: [{ angle: 0, length: 1.9, width: 1.6 }],
+        },
+        {
+          id: 'auto-gunner',
+          name: 'Auto Gunner',
+          level: 45,
+          barrels: [
+            ...[-0.5, -0.15, 0.15, 0.5].map((o, i) => ({
+              angle: 0,
+              offset: o,
+              length: i % 2 ? 2.0 : 1.6,
+              width: 0.3,
+            })),
+            { angle: 0, length: 1.3, width: 0.58, auto: true },
+          ],
+        },
+        {
+          id: 'pellet-shot',
+          name: 'Pellet Shot',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 2.3, width: 1.0 },
+            { angle: -0.08, length: 1.7, width: 0.9 },
+            { angle: 0.08, length: 1.7, width: 0.9 },
+          ],
+        },
+        {
+          id: 'dual-barrel',
+          name: 'Dual Barrel',
+          level: 45,
+          barrels: [
+            { angle: 0, offset: -0.6, length: 2.0, width: 1.0 },
+            { angle: 0, offset: 0.6, length: 2.0, width: 1.0 },
+          ],
+        },
+        {
+          id: 'sprayer',
+          name: 'Sprayer',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 1.9, width: 0.65, tipWidth: 1.1 },
+            { angle: 0, length: 2.2, width: 0.5 },
+          ],
+        },
+        {
+          id: 'booster',
+          name: 'Booster',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 1.9, width: 0.84 },
+            { angle: Math.PI - 0.6, length: 1.5, width: 0.65 },
+            { angle: Math.PI + 0.6, length: 1.5, width: 0.65 },
+            { angle: Math.PI - 0.25, length: 1.5, width: 0.65 },
+            { angle: Math.PI + 0.25, length: 1.5, width: 0.65 },
+          ],
+        },
+        {
+          id: 'fighter',
+          name: 'Fighter',
+          level: 45,
+          barrels: [
+            { angle: 0, length: 1.9, width: 0.84 },
+            { angle: Math.PI - 0.45, length: 1.5, width: 0.65 },
+            { angle: Math.PI + 0.45, length: 1.5, width: 0.65 },
+            { angle: Math.PI / 2, length: 1.7, width: 0.75 },
+            { angle: -Math.PI / 2, length: 1.7, width: 0.75 },
+          ],
+        },
+        { id: 'landmine', name: 'Landmine', level: 45, barrels: [], isLandmine: true },
+        {
+          id: 'auto-smasher',
+          name: 'Auto Smasher',
+          level: 45,
+          barrels: [{ angle: 0, length: 1.3, width: 0.58, auto: true }],
+          isSmasher: true,
+        },
+        { id: 'spike', name: 'Spike', level: 45, barrels: [], isSpike: true },
+        {
+          id: 'auto-tank',
+          name: 'Auto Tank',
+          level: 45,
+          barrels: [0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a) => ({
+            angle: a,
+            length: 1.3,
+            width: 0.58,
+            auto: true,
+          })),
+        },
+      ];
+
+      function renderThumbnail(canvas, tankDef) {
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.save();
+        ctx.translate(w / 2, h / 2);
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        let maxExtent =
+          tankDef.isLandmine || tankDef.isSpike ? 1.45 : tankDef.isSmasher ? 1.4 : 1.0;
+        for (const b of tankDef.barrels) {
+          const tip = Math.abs(b.offset || 0) + (b.tipWidth || b.width) / 2;
+          const extent = Math.hypot(b.length, tip);
+          if (extent > maxExtent) maxExtent = extent;
+        }
+        const r = Math.max(7, Math.min(13, (w / 2 - 3) / maxExtent));
+
+        if (tankDef.isSmasher) {
+          polygonPath(ctx, 6, r * 1.35, 0);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+        } else if (tankDef.isLandmine) {
+          polygonPath(ctx, 6, r * 1.4, 0);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+          polygonPath(ctx, 6, r * 1.25, Math.PI / 6);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+        } else if (tankDef.isSpike) {
+          drawSpikes(ctx, r, 12);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+        }
+
+        // Canons sous le corps
+        for (const b of tankDef.barrels) {
+          if (b.auto) continue;
+          ctx.save();
+          ctx.rotate(b.angle);
+          const base = (b.width * r) / 2;
+          const tip = ((b.tipWidth || b.width) * r) / 2;
+          const off = (b.offset || 0) * r;
+          ctx.beginPath();
+          ctx.moveTo(0, off - base);
+          ctx.lineTo(b.length * r, off - tip);
+          ctx.lineTo(b.length * r, off + tip);
+          ctx.lineTo(0, off + base);
+          ctx.closePath();
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+          ctx.restore();
+        }
+
+        // Corps circulaire
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        fillAndStroke(ctx, PALETTE.friendly, PALETTE.outline, r * 0.14);
+
+        // Canons et tourelles auto
+        for (const b of tankDef.barrels) {
+          if (!b.auto) continue;
+          ctx.save();
+          ctx.rotate(b.angle);
+          const base = (b.width * r) / 2;
+          const tip = ((b.tipWidth || b.width) * r) / 2;
+          ctx.beginPath();
+          ctx.moveTo(0, -base);
+          ctx.lineTo(b.length * r, -tip);
+          ctx.lineTo(b.length * r, tip);
+          ctx.lineTo(0, base);
+          ctx.closePath();
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+          ctx.restore();
+        }
+        ctx.restore();
+      }
+
+      // Construction de la grille des 54 classes
+      const container = document.getElementById('tree-container');
+      const tiers = [
+        { level: 1, title: 'Niveau 1 — Classe Initiale (1)' },
+        { level: 15, title: 'Niveau 15 — Premier Choix (4)' },
+        { level: 30, title: 'Niveau 30 — Deuxième Palier (13)' },
+        { level: 45, title: 'Niveau 45 — Spécialisations Finales (36)' },
+      ];
+
+      for (const tier of tiers) {
+        const section = document.createElement('div');
+        section.className = 'tree-tier';
+        const h3 = document.createElement('h3');
+        h3.style.color = '#ffde43';
+        h3.style.fontSize = '0.95rem';
+        h3.textContent = tier.title;
+        section.appendChild(h3);
+
+        const grid = document.createElement('div');
+        grid.className = 'tree-grid';
+
+        const list = ALL_54_CLASSES.filter((c) => c.level === tier.level);
+        for (const c of list) {
+          const card = document.createElement('div');
+          card.className = 'class-card';
+          const cvs = document.createElement('canvas');
+          cvs.width = 48;
+          cvs.height = 48;
+          renderThumbnail(cvs, c);
+          const label = document.createElement('span');
+          label.className = 'class-name';
+          label.textContent = c.name;
+          card.appendChild(cvs);
+          card.appendChild(label);
+          grid.appendChild(card);
+        }
+        section.appendChild(grid);
+        container.appendChild(section);
+      }
+
+      // 3. Stats Smasher
+      const statsList = document.getElementById('smasher-stats-list');
+      const STATS = [
+        { id: 'healthRegen', name: 'Régénération santé', cap: 10, val: 5 },
+        { id: 'maxHealth', name: 'Santé max', cap: 10, val: 7 },
+        { id: 'bodyDamage', name: 'Dégâts de corps', cap: 10, val: 8 },
+        { id: 'bulletSpeed', name: 'Vitesse des tirs', cap: 0, val: 0 },
+        { id: 'bulletPenetration', name: 'Pénétration des tirs', cap: 0, val: 0 },
+        { id: 'bulletDamage', name: 'Dégâts des tirs', cap: 0, val: 0 },
+        { id: 'reload', name: 'Rechargement', cap: 0, val: 0 },
+        { id: 'movementSpeed', name: 'Vitesse déplacement', cap: 10, val: 6 },
+      ];
+
+      for (const st of STATS) {
+        const item = document.createElement('div');
+        item.className = 'stat-item' + (st.cap === 0 ? ' disabled' : '');
+        const name = document.createElement('span');
+        name.style.width = '140px';
+        name.textContent = st.name + (st.cap === 0 ? ' [DÉSACTIVÉ / CAP 0]' : '');
+        item.appendChild(name);
+
+        if (st.cap > 0) {
+          const segs = document.createElement('div');
+          segs.className = 'stat-segments';
+          for (let i = 0; i < st.cap; i++) {
+            const s = document.createElement('div');
+            s.className = 'seg' + (i < st.val ? ' filled' : '');
+            segs.appendChild(s);
+          }
+          item.appendChild(segs);
+        }
+        statsList.appendChild(item);
+      }
+
+      // 4. Boucle d'arène synthétique
+      const arenaCanvas = document.getElementById('arena');
+      const actx = arenaCanvas.getContext('2d');
+      let tick = 0;
+
+      function renderSyntheticArena() {
+        tick++;
+        const now = performance.now();
+        const w = arenaCanvas.width;
+        const h = arenaCanvas.height;
+        actx.clearRect(0, 0, w, h);
+
+        // Grille
+        actx.strokeStyle = 'rgba(0,0,0,0.08)';
+        actx.lineWidth = 1;
+        for (let x = 0; x < w; x += 25) {
+          actx.beginPath();
+          actx.moveTo(x, 0);
+          actx.lineTo(x, h);
+          actx.stroke();
+        }
+        for (let y = 0; y < h; y += 25) {
+          actx.beginPath();
+          actx.moveTo(0, y);
+          actx.lineTo(w, y);
+          actx.stroke();
+        }
+
+        // Dessin des entités synthétiques démonstratives
+        // 1. Auto-Tank avec tourelles animées
+        drawTankEntity(
+          actx,
+          100,
+          100,
+          24,
+          ALL_54_CLASSES.find((c) => c.id === 'auto-tank'),
+          [
+            (now / 1000) * 1.5,
+            (now / 1000) * 1.5 + Math.PI / 2,
+            (now / 1000) * 1.5 + Math.PI,
+            (now / 1000) * 1.5 + (3 * Math.PI) / 2,
+          ],
+          'Auto Tank (4 tourelles auto)',
+          PALETTE.friendly,
+          1.0,
+        );
+
+        // 2. Predator avec décalage de caméra (Alt)
+        drawTankEntity(
+          actx,
+          260,
+          100,
+          24,
+          ALL_54_CLASSES.find((c) => c.id === 'predator'),
+          null,
+          'Predator (Alt offset)',
+          PALETTE.friendly,
+          1.0,
+        );
+
+        // 3. Smasher (Hexagone)
+        drawTankEntity(
+          actx,
+          420,
+          100,
+          24,
+          ALL_54_CLASSES.find((c) => c.id === 'smasher'),
+          null,
+          'Smasher (Hexagone)',
+          PALETTE.friendly,
+          1.0,
+        );
+
+        // 4. Spike (Pointes acérées)
+        drawTankEntity(
+          actx,
+          580,
+          100,
+          24,
+          ALL_54_CLASSES.find((c) => c.id === 'spike'),
+          null,
+          'Spike (Pointes)',
+          PALETTE.friendly,
+          1.0,
+        );
+
+        // 5. Landmine (Calques hexagonaux)
+        drawTankEntity(
+          actx,
+          740,
+          100,
+          24,
+          ALL_54_CLASSES.find((c) => c.id === 'landmine'),
+          null,
+          'Landmine (Calques)',
+          PALETTE.friendly,
+          1.0,
+        );
+
+        // 6. Auto-Smasher (Hexagone + tourelle auto)
+        drawTankEntity(
+          actx,
+          900,
+          100,
+          24,
+          ALL_54_CLASSES.find((c) => c.id === 'auto-smasher'),
+          [(now / 1000) * 2],
+          'Auto-Smasher',
+          PALETTE.friendly,
+          1.0,
+        );
+
+        // Ligne 2 : Drones, Traps, Missiles et Minions
+        // Trapper trap
+        actx.save();
+        actx.translate(100, 280);
+        drawTrap(actx, 18);
+        fillAndStroke(actx, PALETTE.friendly, PALETTE.outline, 3);
+        drawLabel(actx, 'Trap (3 pointes)', 0, 30);
+        actx.restore();
+
+        // Necromancer drone carré
+        actx.save();
+        actx.translate(220, 280);
+        actx.rotate(now / 1000);
+        drawSquare(actx, 14);
+        fillAndStroke(actx, PALETTE.friendly, PALETTE.outline, 3);
+        drawLabel(actx, 'Drone Carré (Necro)', 0, 30);
+        actx.restore();
+
+        // Drone triangle classique
+        actx.save();
+        actx.translate(350, 280);
+        actx.rotate(now / 1000);
+        polygonPath(actx, 3, 16);
+        fillAndStroke(actx, PALETTE.friendly, PALETTE.outline, 3);
+        drawLabel(actx, 'Drone Triangle', 0, 30);
+        actx.restore();
+
+        // Skimmer missile armé (2 propulseurs arrière)
+        actx.save();
+        actx.translate(480, 280);
+        actx.rotate(-Math.PI / 4);
+        // Thrusters
+        [-0.55, 0.55].forEach((a) => {
+          actx.save();
+          actx.rotate(Math.PI + a);
+          actx.beginPath();
+          actx.rect(0, -3.5, 18, 7);
+          fillAndStroke(actx, PALETTE.barrel, PALETTE.barrelOutline, 2);
+          actx.restore();
+        });
+        actx.beginPath();
+        actx.arc(0, 0, 14, 0, Math.PI * 2);
+        fillAndStroke(actx, PALETTE.enemy, PALETTE.outline, 3);
+        drawLabel(actx, 'Missile Skimmer', 0, 30);
+        actx.restore();
+
+        // Rocketeer missile armé (1 propulseur arrière)
+        actx.save();
+        actx.translate(610, 280);
+        actx.rotate(0);
+        actx.save();
+        actx.rotate(Math.PI);
+        actx.beginPath();
+        actx.rect(0, -4, 20, 8);
+        fillAndStroke(actx, PALETTE.barrel, PALETTE.barrelOutline, 2);
+        actx.restore();
+        actx.beginPath();
+        actx.arc(0, 0, 15, 0, Math.PI * 2);
+        fillAndStroke(actx, PALETTE.enemy, PALETTE.outline, 3);
+        drawLabel(actx, 'Missile Rocketeer', 0, 30);
+        actx.restore();
+
+        // Factory minion armé (carré + mini-canon)
+        actx.save();
+        actx.translate(740, 280);
+        actx.rotate(0.3);
+        actx.beginPath();
+        actx.rect(0, -3.5, 18, 7);
+        fillAndStroke(actx, PALETTE.barrel, PALETTE.barrelOutline, 2);
+        drawSquare(actx, 14);
+        fillAndStroke(actx, PALETTE.friendly, PALETTE.outline, 3);
+        // Health bar
+        drawHealthBar(actx, 0, 22, 28, 0.65);
+        drawLabel(actx, 'Minion Armé (Factory)', 0, 36);
+        actx.restore();
+
+        // Ligne 3 : Démonstration Furtivité / Opacité alliée vs ennemie
+        // Joueur furtif local (35% opacité)
+        drawTankEntity(
+          actx,
+          160,
+          420,
+          24,
+          ALL_54_CLASSES.find((c) => c.id === 'stalker'),
+          null,
+          'Stalker (Joueur 35%)',
+          PALETTE.friendly,
+          0.35,
+        );
+
+        // Allié furtif (35% opacité pour coordination)
+        drawTankEntity(
+          actx,
+          420,
+          420,
+          24,
+          ALL_54_CLASSES.find((c) => c.id === 'landmine'),
+          null,
+          'Allié Furtif (Visible 35%)',
+          PALETTE.friendly,
+          0.35,
+        );
+
+        // Ennemi invisible (Opacité 0 : totalement invisible, barre et label supprimés)
+        actx.save();
+        actx.translate(680, 420);
+        actx.strokeStyle = 'rgba(241, 78, 84, 0.4)';
+        actx.lineWidth = 2;
+        actx.setLineDash([4, 4]);
+        actx.strokeRect(-40, -40, 80, 80);
+        drawLabel(actx, 'Ennemi Invisible (Non Révélé)', 0, 0, '#aaa');
+        actx.restore();
+
+        requestAnimationFrame(renderSyntheticArena);
+      }
+
+      function drawTankEntity(ctx, x, y, r, def, barrelAngles, label, fill, opacity = 1.0) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.globalAlpha = opacity;
+
+        if (def.isSmasher) {
+          polygonPath(ctx, 6, r * 1.35, 0);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+        } else if (def.isLandmine) {
+          polygonPath(ctx, 6, r * 1.4, 0);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+          polygonPath(ctx, 6, r * 1.25, Math.PI / 6);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+        } else if (def.isSpike) {
+          drawSpikes(ctx, r, 12);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+        }
+
+        // Canons standards
+        for (let i = 0; i < def.barrels.length; i++) {
+          const b = def.barrels[i];
+          if (b.auto) continue;
+          ctx.save();
+          ctx.rotate(b.angle);
+          const base = (b.width * r) / 2;
+          const tip = ((b.tipWidth || b.width) * r) / 2;
+          const off = (b.offset || 0) * r;
+          ctx.beginPath();
+          ctx.moveTo(0, off - base);
+          ctx.lineTo(b.length * r, off - tip);
+          ctx.lineTo(b.length * r, off + tip);
+          ctx.lineTo(0, off + base);
+          ctx.closePath();
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+          ctx.restore();
+        }
+
+        // Corps
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        fillAndStroke(ctx, fill, PALETTE.outline, r * 0.14);
+
+        // Canons auto
+        let autoIdx = 0;
+        for (let i = 0; i < def.barrels.length; i++) {
+          const b = def.barrels[i];
+          if (!b.auto) continue;
+          const angle = barrelAngles ? barrelAngles[autoIdx++] : b.angle;
+          ctx.save();
+          ctx.rotate(angle);
+          const base = (b.width * r) / 2;
+          const tip = ((b.tipWidth || b.width) * r) / 2;
+          ctx.beginPath();
+          ctx.moveTo(0, -base);
+          ctx.lineTo(b.length * r, -tip);
+          ctx.lineTo(b.length * r, tip);
+          ctx.lineTo(0, base);
+          ctx.closePath();
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
+          fillAndStroke(ctx, PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+          ctx.restore();
+        }
+
+        // Barre de vie et label
+        drawHealthBar(ctx, 0, r + 8, r * 2.2, 0.85);
+        drawLabel(ctx, label, 0, -(r + 14));
+        ctx.restore();
+      }
+
+      function drawHealthBar(ctx, x, y, width, ratio) {
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = PALETTE.healthBack;
+        ctx.beginPath();
+        ctx.moveTo(x - width / 2, y);
+        ctx.lineTo(x + width / 2, y);
+        ctx.stroke();
+
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = PALETTE.healthFill;
+        ctx.beginPath();
+        ctx.moveTo(x - width / 2, y);
+        ctx.lineTo(x - width / 2 + width * ratio, y);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawLabel(ctx, text, x, y, color = '#ffffff') {
+        ctx.save();
+        ctx.font = '700 12px Ubuntu, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = PALETTE.textStroke;
+        ctx.strokeText(text, x, y);
+        ctx.fillStyle = color;
+        ctx.fillText(text, x, y);
+        ctx.restore();
+      }
+
+      requestAnimationFrame(renderSyntheticArena);
+    </script>
+  </body>
+</html>

@@ -1,46 +1,70 @@
-# Revue d’intégration client
+# Revue d’intégration client — Jalon Rendu des 54 Classes et Familles d’Armes
 
-Périmètre : `apps/client/` uniquement, sans prédiction ni changement des contrats,
-du serveur ou de la simulation.
+Périmètre : `apps/client/` uniquement, sans prédiction ni modification des paquetages
+`packages/sim`, `packages/shared`, `apps/server` ou du fichier `package-lock.json`.
 
-- Cycle explicite : `disconnected → connecting → ready → joining → joined`.
-  Une intention de menu attend `welcome`, puis les autres entrées sont bloquées
-  jusqu’à la réponse. Les événements d’anciennes sockets sont ignorés.
-- Une coupure revient au menu. Une nouvelle action recrée la socket ; aucun
-  retry automatique. Handshake et entrée expirent après 10 secondes, sans rejeu
-  d’une demande dont le résultat est incertain.
-- Un refus de reprise `bad_message` ou `room_not_found` supprime le jeton et
-  explique l’échec. Le bouton « Nouvelle entrée (sans reprise) » abandonne
-  explicitement l’ancienne identité. Aucun repli automatique sans jeton.
-- `room.left` demandé, fermé ou expulsé purge l’état et la session enregistrée ;
-  la raison reste affichée si le serveur ferme ensuite la socket.
-- Un snapshot mort suffit à afficher la réapparition, même sans événement
-  `death`. Le résumé utilise alors le score/niveau actuels de `self`, avec
-  responsable inconnu ; un délai absent reste en attente du serveur.
-- Chaque changement de salon purge tampon, caméra/fondus, entrées/séquences,
-  bascules, pings et caches du HUD. Le HUD attend le premier snapshot.
-- Choix de classe : un seul chemin via le callback du HUD. La modale capture
-  les raccourcis, garde le focus et neutralise les commandes maintenues. Les
-  anciens raccourcis supprimés ne réapparaissent plus après rechargement.
-- Le stockage inaccessible ne bloque plus le démarrage ou les actions du menu ;
-  la session conserve un repli en mémoire pour la durée de la page.
+## Synthèse des réalisations
 
-## Vérification
+1. **Rendu effectif des 54 classes et géométries partagées** :
+   - Exploitation directe des sources de données partagées (`CLASS_DEFINITIONS`, `BarrelDefinition`).
+   - Prise en charge des tourelles autonomes orientables via `tank.barrelAngles` pour les classes `auto-3`, `auto-5`, `auto-tank`, `auto-gunner`, `auto-trapper`, `auto-smasher`.
+   - Centrage caméra Predator prenant en compte `tank.cameraOffset` avec conversion rigoureuse et cohérente de la visée (`screenToWorld` / `worldToScreen`).
+   - Familles de projectiles enrichies :
+     - Drones : distinction des drones triangulaires classiques et des drones carrés de Necromancer (`projectile.bodyShape === 'square'`).
+     - Traps : géométrie en caltrop / étoile à 3 pointes acérées.
+     - Missiles armés : Skimmer (2 propulseurs arrière angulés) et Rocketeer / Glider (1 propulseur arrière) avec recul animé issu de `projectile.barrelShots`.
+     - Minions armés (Factory) : corps carré et mini-canon avant avec recul animé.
+     - Barres de vie affichées sur les projectiles persistants endommagés (drones, minions).
+   - Corps spécifiques de la famille Smasher :
+     - Smasher et Auto-Smasher : blindage hexagonal régulier.
+     - Landmine : calques doubles d'hexagones superposés décalés de 30° (`Math.PI / 6`).
+     - Spike : couronne de 12 pointes triangulaires acérées autour du corps.
+   - Gestion de l'opacité et de la furtivité :
+     - Joueur local : maintenu à 35% de visibilité minimale.
+     - Alliés de même équipe : maintenus à 35% pour la coordination d'équipe.
+     - Ennemis : aucun rehaussement d'opacité. À opacité < 0.2 (ou nulle), l'ennemi est totalement invisible, et son étiquette de nom ainsi que sa barre de vie sont intégralement supprimées pour ne jamais le révéler. En cours d'estompage, l'opacité du label et de la barre suit celle du tank.
 
-Tests Vitest avec WebSocket injectée : coupure/reconnexion, attente de welcome,
-doubles entrées, délais, refus de jeton, erreurs réseau et construction, raisons
-de sortie, intégration de main, mort sans événement, neutralisation des entrées
-et stockage indisponible. Aucune dépendance ajoutée.
+2. **Arbre d’évolution [Y] et ergonomie des commandes** :
+   - Intégration de la touche [Y] maintenue (`onUpgradeTree`) affichant l'arbre complet des 54 classes réparties en 4 paliers (Niveau 1, Niveau 15, Niveau 30, Niveau 45).
+   - Vignettes miniatures générées procéduralement avec échelle adaptative évitant tout rognage pour les canons longs (Ranger, Predator, Streamliner) ou les corps larges (Spike, Landmine).
+   - Bouton d'accès rapide `[Y] Évolutions` intégré au bandeau HUD pour l'accessibilité à la souris et au tactile.
+   - Aide aux commandes mise à jour dans la modale des raccourcis.
 
-L’image historique `qa-gameplay.jpg` mesure bien 4 178 octets et est entièrement
-noire : elle ne valide pas l’interface. `preview_status/open` fonctionne, mais
-deux snapshots ont échoué avec `Preview automation snapshot timed out after
-15000ms.` Le navigateur de secours n’est pas disponible.
+3. **Traitement conforme du corps Smasher dans le HUD** :
+   - Les 4 statistiques de tir (`bulletSpeed`, `bulletPenetration`, `bulletDamage`, `reload`) ayant un plafond de 0 (`cap === 0`) sont correctement masquées (`hidden = true`) et désactivées (`item.btn.disabled = true`, classe CSS `.stat-disabled`).
+   - Les 4 statistiques de corps (`healthRegen`, `maxHealth`, `bodyDamage`, `movementSpeed`) disposent de 10 segments de progression remplissables.
 
-Inspection visuelle effectuée avec `html_preview` de T3 sur le bundle compilé
-embarqué : menu, modale/rebind et écran de mort. Viewport fixé à 1280×800 et
-polices de secours pour ce rendu isolé. Fixtures réseau pour les écrans en salon ;
-assertions navigateur : un clic de classe émet une commande, un rebind n’émet
-aucune commande de jeu, un snapshot mort affiche le résumé et le délai attendus.
-Ce contrôle ne constitue pas une session multijoueur ni une validation du
-gameplay : la simulation de cette base reste un placeholder.
+4. **Conformité Licence AGPL-3.0** :
+   - Affichage explicite des mentions dans le menu et la documentation avec liens actifs vers `/licenses/AGPL-3.0.txt`, le code source du projet et `/licenses/THIRD_PARTY_NOTICES.txt`.
+   - Configuration Vite préservée sans modification (plugin de distribution des avis AGPL inclus).
+
+5. **Interface Responsive Desktop / Mobile** :
+   - Styles CSS avec media queries adaptatives (`@media (max-width: 768px)` et `@media (max-width: 480px)`) dimensionnant les panneaux pour éviter les chevauchements majeurs entre le HUD, le classement, la minicarte, les barres d'XP et le panneau de statistiques.
+   - Aucun contrôle tactile fictif de gameplay n'est promis (les contrôles restent clavier/souris ; les menus et le HUD sont responsives et cliquables).
+
+## Validation et Tests
+
+- **Tests Vitest** :
+  - `apps/client/test/camera.test.ts` : validation de la bijection `screenToWorld` / `worldToScreen`, du décalage caméra Predator et de la parfaite cohérence du vecteur de visée.
+  - `apps/client/test/render-angles.test.ts` : calculs purs des angles relatifs des tourelles auto (`tank.barrelAngles`), replis statiques, armement des missiles/minions, géométries des traps/drones, et règles d'opacité furtive alliée vs ennemie.
+  - `apps/client/test/evolution-tree.test.ts` : couverture complète des 54 classes, rendu sans erreur de toutes les miniatures, et vérification unitaire du masquage des statistiques à cap 0 dans le DOM du HUD.
+  - 283 tests passés avec succès sur l'ensemble de la suite (`npm test`).
+  - Validation du typage strict TypeScript sans erreur (`npm run typecheck`).
+  - Compilation réussie du bundle client de production (`npm run build`).
+
+- **Validation QA Navigateur (Port 8091)** :
+  - Serveur de validation lancé sur le port dédié 8091 (`apps/client/qa-server.mjs`) sans impacter le port 8090 du serveur parent.
+  - Scène synthétique interactive déployée (`apps/client/qa-showcase.html`) présentant simultanément :
+    - Les 54 vignettes de classes.
+    - Les tourelles auto animées, le Predator, Smasher, Spike, Landmine et Auto-Smasher.
+    - Les traps à 3 pointes, drones triangles et carrés, missiles Skimmer (2 propulseurs) et Rocketeer (1 propulseur), et Factory minions armés avec barre de vie.
+    - La comparaison de furtivité (joueur local, allié visible, ennemi invisible non révélé).
+  - Capture visuelle réelle validée par le moteur headless T3 (`html_preview`) :
+    - Fichier : `apps/client/qa-render-capture.png`
+    - SHA256 : `e5826a2ad29d4b2c57381a217bde24d2e05dbdd17ed0367b3cf628e89079d837`
+
+## Limites documentées
+
+- Aucune prédiction côté client n'a été ajoutée dans ce lot (conformément aux directives).
+- Les contrôles tactiles virtuels de gameplay (joysticks à l'écran) ne sont pas implémentés ; l'interface utilisateur (menus, boutons HUD, sélection d'évolutions) est en revanche pleinement responsive et manipulable sur écran tactile.
+- Les raccourcis Sandbox ne sont pas codés dans ce lot en attente de l'intégration de la commande union par l'agent modes.

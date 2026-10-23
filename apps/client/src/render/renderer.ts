@@ -1,5 +1,6 @@
 import {
   getClassDefinition,
+  type BarrelDefinition,
   type EntityState,
   type ModeConfig,
   type ProjectileState,
@@ -28,6 +29,8 @@ const LAYER: Readonly<Record<string, number>> = {
   shape: 0,
   trap: 1,
   drone: 2,
+  minion: 2,
+  missile: 3,
   bullet: 3,
   tank: 4,
 };
@@ -59,8 +62,9 @@ export class Renderer {
   /** Ajuste la résolution du canvas à sa taille affichée et à la densité de pixels. */
   resize(): void {
     const ratio = window.devicePixelRatio || 1;
-    this.width = this.canvas.clientWidth;
-    this.height = this.canvas.clientHeight;
+    const rect = this.canvas.getBoundingClientRect();
+    this.width = rect.width;
+    this.height = rect.height;
     this.canvas.width = Math.round(this.width * ratio);
     this.canvas.height = Math.round(this.height * ratio);
     this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -74,14 +78,18 @@ export class Renderer {
     ctx.fillStyle = PALETTE.background;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    const own = frame?.entities.find((entity) => entity.id === frame.self.entityId);
-    const center = own ?? this.camera?.center ?? arenaCenter(config);
-    const camera = makeCamera(
-      { x: center.x, y: center.y },
-      frame?.self.view ?? 900,
-      this.width,
-      this.height,
+    const own = frame?.entities.find(
+      (entity): entity is TankState => entity.kind === 'tank' && entity.id === frame.self.entityId,
     );
+    // Prise en compte du décalage caméra Predator (Alt) pour centrer la vue
+    const center = own
+      ? {
+          x: own.x + (own.cameraOffset?.x ?? 0),
+          y: own.y + (own.cameraOffset?.y ?? 0),
+        }
+      : (this.camera?.center ?? arenaCenter(config));
+
+    const camera = makeCamera(center, frame?.self.view ?? 900, this.width, this.height);
     this.camera = camera;
 
     if (config) this.drawOutsideArena(camera, config);
@@ -107,13 +115,16 @@ export class Renderer {
       ctx.scale(camera.scale, camera.scale);
 
       if (entity.kind === 'tank') {
+        const isSelf = entity.id === ownEntityId;
+        const isAlly = ownTeam !== null && entity.team === ownTeam && !isSelf;
         this.drawTank(entity, this.teamFill(entity.team, ownTeam, config), currentTick, nowMs, {
           alphaMultiplier: alpha,
-          isSelf: entity.id === ownEntityId,
+          isSelf,
+          isAlly,
         });
       } else if (entity.kind === 'projectile') {
         ctx.globalAlpha = alpha;
-        this.drawProjectile(entity, this.teamFill(entity.team, ownTeam, config));
+        this.drawProjectile(entity, this.teamFill(entity.team, ownTeam, config), currentTick);
       } else {
         ctx.globalAlpha = alpha;
         this.drawShape(entity);
@@ -130,11 +141,14 @@ export class Renderer {
       ctx.scale(camera.scale, camera.scale);
 
       if (entity.kind === 'tank') {
+        const isSelf = entity.id === ownEntityId;
+        const isAlly = ownTeam !== null && entity.team === ownTeam && !isSelf;
         this.drawTank(entity, this.teamFill(entity.team, ownTeam, config), currentTick, nowMs, {
-          isSelf: entity.id === ownEntityId,
+          isSelf,
+          isAlly,
         });
       } else if (entity.kind === 'projectile') {
-        this.drawProjectile(entity, this.teamFill(entity.team, ownTeam, config));
+        this.drawProjectile(entity, this.teamFill(entity.team, ownTeam, config), currentTick);
       } else {
         this.drawShape(entity);
       }
@@ -143,15 +157,47 @@ export class Renderer {
 
     // 3. Barres de vie et étiquettes au premier plan
     for (const entity of sorted) {
-      if (entity.kind === 'projectile') continue;
-      // Ne pas afficher la barre si l'entité est invisible ou quasi invisible
-      if (entity.kind === 'tank' && entity.opacity < 0.2 && entity.id !== ownEntityId) {
+      if (entity.kind === 'projectile') {
+        // Barre de vie pour les projectiles avec points de vie (drones, minions)
+        if (
+          entity.health !== undefined &&
+          entity.maxHealth !== undefined &&
+          entity.health < entity.maxHealth
+        ) {
+          const at = worldToScreen(camera, entity);
+          this.drawHealthBar(entity, at, camera.scale);
+        }
         continue;
       }
-      const at = worldToScreen(camera, entity);
-      this.drawHealthBar(entity, at, camera.scale);
-      if (entity.kind === 'tank' && entity.id !== frame.self.entityId) {
-        this.drawLabel(entity.name, at.x, at.y - (entity.radius + 14) * camera.scale, 14);
+
+      if (entity.kind === 'tank') {
+        const isSelf = entity.id === ownEntityId;
+        const isAlly = ownTeam !== null && entity.team === ownTeam && !isSelf;
+        const isEnemy = !isSelf && !isAlly;
+
+        // Ne révèle jamais les ennemis invisibles
+        if (isEnemy && entity.opacity < 0.2) {
+          continue;
+        }
+
+        const at = worldToScreen(camera, entity);
+        // Si l'ennemi s'estompe, atténuer la barre de vie et le nom
+        if (isEnemy && entity.opacity < 1) {
+          ctx.save();
+          ctx.globalAlpha = entity.opacity;
+          this.drawHealthBar(entity, at, camera.scale);
+          this.drawLabel(entity.name, at.x, at.y - (entity.radius + 14) * camera.scale, 14);
+          ctx.restore();
+          continue;
+        }
+
+        this.drawHealthBar(entity, at, camera.scale);
+        if (!isSelf) {
+          this.drawLabel(entity.name, at.x, at.y - (entity.radius + 14) * camera.scale, 14);
+        }
+      } else {
+        const at = worldToScreen(camera, entity);
+        this.drawHealthBar(entity, at, camera.scale);
       }
     }
   }
@@ -200,21 +246,23 @@ export class Renderer {
 
   /**
    * Repère local : origine au centre du tank, unités monde.
-   * Prend en compte l'opacité, le clignotement de spawnProtected et le recul des canons.
+   * Gère l'opacité alliée/ennemie, le recul, les canons auto et les corps Smasher/Spike/Landmine.
    */
   private drawTank(
     tank: TankState,
     fill: string,
     currentTick: number,
     nowMs: number,
-    options: { alphaMultiplier?: number; isSelf?: boolean } = {},
+    options: { alphaMultiplier?: number; isSelf?: boolean; isAlly?: boolean } = {},
   ): void {
     const { ctx } = this;
     const definition = getClassDefinition(tank.classId);
 
-    // Calcul de l'opacité : pour le joueur lui-même, on maintient au moins 35% de visibilité
+    // Calcul de l'opacité :
+    // Le joueur local et ses alliés conservent au moins 35% de visibilité.
+    // Les ennemis n'ont aucun boost (ne révèle pas les ennemis invisibles).
     let baseOpacity = tank.opacity;
-    if (options.isSelf) {
+    if (options.isSelf || options.isAlly) {
       baseOpacity = Math.max(0.35, baseOpacity);
     }
 
@@ -225,55 +273,204 @@ export class Renderer {
     }
 
     const finalAlpha = baseOpacity * (options.alphaMultiplier ?? 1);
+    if (finalAlpha <= 0.001) return;
     ctx.globalAlpha = Math.max(0, Math.min(1, finalAlpha));
 
     ctx.rotate(tank.angle);
 
-    // Dessin des canons avec calcul de recul par canon
+    const r = tank.radius;
+    const isSmasher = tank.classId === 'smasher' || tank.classId === 'auto-smasher';
+    const isLandmine = tank.classId === 'landmine';
+    const isSpike = tank.classId === 'spike';
+
+    // Corps spéciaux de la famille Smasher (dessinés sous le corps circulaire)
+    if (isSmasher) {
+      polygonPath(ctx, 6, r * 1.35, 0);
+      this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+    } else if (isLandmine) {
+      // Landmine : deux calques hexagonaux décalés
+      polygonPath(ctx, 6, r * 1.4, 0);
+      this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+      polygonPath(ctx, 6, r * 1.25, Math.PI / 6);
+      this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+    } else if (isSpike) {
+      // Spike : couronne de 12 pointes acérées
+      drawSpikes(ctx, r, 12);
+      this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+    }
+
+    // 1. Canons standards (non autonomes) sous le corps
     const barrels = definition?.barrels ?? [];
     for (let i = 0; i < barrels.length; i++) {
       const barrel = barrels[i]!;
+      if (barrel.auto) continue;
+      this.drawBarrel(barrel, r, currentTick, tank.barrelShots[i]);
+    }
+
+    // Corps principal du tank (cercle coloré)
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    this.fillAndStroke(fill, PALETTE.outline, r * 0.12);
+
+    // 2. Tourelles autonomes (auto) sur le corps, orientées selon tank.barrelAngles
+    for (let i = 0; i < barrels.length; i++) {
+      const barrel = barrels[i]!;
+      if (!barrel.auto) continue;
+      const worldAngle =
+        tank.barrelAngles && typeof tank.barrelAngles[i] === 'number'
+          ? tank.barrelAngles[i]!
+          : tank.angle + barrel.angle;
+      const localAngle = worldAngle - tank.angle;
+      this.drawAutoBarrel(barrel, r, currentTick, tank.barrelShots[i], localAngle);
+    }
+  }
+
+  private drawBarrel(
+    barrel: BarrelDefinition,
+    r: number,
+    currentTick: number,
+    shotTick: number | undefined,
+  ): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.rotate(barrel.angle);
+
+    const base = (barrel.width * r) / 2;
+    const tip = ((barrel.tipWidth ?? barrel.width) * r) / 2;
+    const offset = barrel.offset * r;
+
+    const recoilFactor = calculateBarrelRecoil(currentTick, shotTick, 4);
+    const recoilOffset = calculateRecoilOffset(barrel.length, r, recoilFactor, barrel.recoil);
+
+    ctx.translate(-recoilOffset, 0);
+
+    ctx.beginPath();
+    ctx.moveTo(0, offset - base);
+    ctx.lineTo(barrel.length * r, offset - tip);
+    ctx.lineTo(barrel.length * r, offset + tip);
+    ctx.lineTo(0, offset + base);
+    ctx.closePath();
+    this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+    ctx.restore();
+  }
+
+  private drawAutoBarrel(
+    barrel: BarrelDefinition,
+    r: number,
+    currentTick: number,
+    shotTick: number | undefined,
+    localAngle: number,
+  ): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.rotate(localAngle);
+
+    const base = (barrel.width * r) / 2;
+    const tip = ((barrel.tipWidth ?? barrel.width) * r) / 2;
+
+    const recoilFactor = calculateBarrelRecoil(currentTick, shotTick, 4);
+    const recoilOffset = calculateRecoilOffset(barrel.length, r, recoilFactor, barrel.recoil);
+
+    ctx.translate(-recoilOffset, 0);
+
+    ctx.beginPath();
+    ctx.moveTo(0, -base);
+    ctx.lineTo(barrel.length * r, -tip);
+    ctx.lineTo(barrel.length * r, tip);
+    ctx.lineTo(0, base);
+    ctx.closePath();
+    this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+
+    // Embase circulaire de la tourelle autonome
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
+    this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+
+    ctx.restore();
+  }
+
+  private drawProjectile(projectile: ProjectileState, fill: string, currentTick = 0): void {
+    const { ctx } = this;
+    const r = projectile.radius;
+
+    ctx.save();
+    ctx.rotate(projectile.angle);
+
+    if (projectile.family === 'trap') {
+      // Traps à 3 pointes acérées (caltrop)
+      drawTrap(ctx, r);
+      this.fillAndStroke(fill, PALETTE.outline, r * 0.2);
+    } else if (projectile.family === 'drone') {
+      if (projectile.bodyShape === 'square') {
+        // Drones carrés (Necromancer)
+        drawSquare(ctx, r);
+      } else {
+        // Drones triangulaires classiques
+        polygonPath(ctx, 3, r);
+      }
+      this.fillAndStroke(fill, PALETTE.outline, r * 0.2);
+    } else if (projectile.family === 'missile') {
+      this.drawMissile(projectile, fill, currentTick);
+    } else if (projectile.family === 'minion') {
+      this.drawMinion(projectile, fill, currentTick);
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      this.fillAndStroke(fill, PALETTE.outline, r * 0.2);
+    }
+    ctx.restore();
+  }
+
+  private drawMissile(projectile: ProjectileState, fill: string, currentTick: number): void {
+    const { ctx } = this;
+    const r = projectile.radius;
+    // Skimmer : deux propulseurs arrière ; Rocketeer / Glider / autres : un propulseur
+    const isSkimmer = projectile.classId === 'skimmer';
+    const thrusters = isSkimmer ? [Math.PI - 0.55, Math.PI + 0.55] : [Math.PI];
+
+    for (let i = 0; i < thrusters.length; i++) {
+      const angle = thrusters[i]!;
       ctx.save();
-      ctx.rotate(barrel.angle);
+      ctx.rotate(angle);
 
-      const r = tank.radius;
-      const base = (barrel.width * r) / 2;
-      const tip = ((barrel.tipWidth ?? barrel.width) * r) / 2;
-      const offset = barrel.offset * r;
-
-      // Calcul du recul
-      const shotTick = tank.barrelShots[i];
-      const recoilFactor = calculateBarrelRecoil(currentTick, shotTick, 4);
-      const recoilOffset = calculateRecoilOffset(barrel.length, r, recoilFactor, barrel.recoil);
-
+      const shotTick = projectile.barrelShots?.[i];
+      const recoilFactor = calculateBarrelRecoil(currentTick, shotTick, 3);
+      const recoilOffset = calculateRecoilOffset(1.2, r, recoilFactor, 0.4);
       ctx.translate(-recoilOffset, 0);
 
+      const bLen = 1.2 * r;
+      const bWidth = 0.45 * r;
       ctx.beginPath();
-      ctx.moveTo(0, offset - base);
-      ctx.lineTo(barrel.length * r, offset - tip);
-      ctx.lineTo(barrel.length * r, offset + tip);
-      ctx.lineTo(0, offset + base);
-      ctx.closePath();
-      this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.12);
+      ctx.rect(0, -bWidth / 2, bLen, bWidth);
+      this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.15);
       ctx.restore();
     }
 
-    // Corps du tank
     ctx.beginPath();
-    ctx.arc(0, 0, tank.radius, 0, Math.PI * 2);
-    this.fillAndStroke(fill, PALETTE.outline, tank.radius * 0.12);
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    this.fillAndStroke(fill, PALETTE.outline, r * 0.2);
   }
 
-  private drawProjectile(projectile: ProjectileState, fill: string): void {
+  private drawMinion(projectile: ProjectileState, fill: string, currentTick: number): void {
     const { ctx } = this;
     const r = projectile.radius;
+
+    // Mini-canon avant orienté selon la visée du minion
+    ctx.save();
+    const shotTick = projectile.barrelShots?.[0];
+    const recoilFactor = calculateBarrelRecoil(currentTick, shotTick, 3);
+    const recoilOffset = calculateRecoilOffset(1.3, r, recoilFactor, 0.4);
+    ctx.translate(-recoilOffset, 0);
+
+    const bLen = 1.3 * r;
+    const bWidth = 0.45 * r;
     ctx.beginPath();
-    if (projectile.family === 'drone' || projectile.family === 'trap') {
-      ctx.rotate(projectile.angle);
-      polygonPath(ctx, 3, r);
-    } else {
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
-    }
+    ctx.rect(0, -bWidth / 2, bLen, bWidth);
+    this.fillAndStroke(PALETTE.barrel, PALETTE.barrelOutline, r * 0.15);
+    ctx.restore();
+
+    // Corps carré du minion
+    drawSquare(ctx, r);
     this.fillAndStroke(fill, PALETTE.outline, r * 0.2);
   }
 
@@ -287,11 +484,17 @@ export class Renderer {
   }
 
   private drawHealthBar(
-    entity: TankState | ShapeState,
+    entity: TankState | ShapeState | ProjectileState,
     at: { x: number; y: number },
     scale: number,
   ) {
-    if (entity.health >= entity.maxHealth) return;
+    if (
+      entity.health === undefined ||
+      entity.maxHealth === undefined ||
+      entity.health >= entity.maxHealth
+    ) {
+      return;
+    }
     const { ctx } = this;
     const width = entity.radius * 2 * scale;
     const y = at.y + (entity.radius + 10) * scale;
@@ -338,11 +541,54 @@ export class Renderer {
   }
 }
 
-function polygonPath(ctx: CanvasRenderingContext2D, sides: number, radius: number): void {
+/** Tracé d'un polygone régulier centré. */
+export function polygonPath(
+  ctx: CanvasRenderingContext2D,
+  sides: number,
+  radius: number,
+  rotation = 0,
+): void {
+  ctx.beginPath();
   for (let k = 0; k < sides; k++) {
-    const angle = (2 * Math.PI * k) / sides;
+    const angle = rotation + (2 * Math.PI * k) / sides;
     if (k === 0) ctx.moveTo(radius * Math.cos(angle), radius * Math.sin(angle));
     else ctx.lineTo(radius * Math.cos(angle), radius * Math.sin(angle));
+  }
+  ctx.closePath();
+}
+
+/** Tracé d'un carré centré. */
+export function drawSquare(ctx: CanvasRenderingContext2D, radius: number): void {
+  ctx.beginPath();
+  ctx.rect(-radius, -radius, radius * 2, radius * 2);
+  ctx.closePath();
+}
+
+/** Tracé d'un piège (trap) à 3 pointes acérées (caltrop). */
+export function drawTrap(ctx: CanvasRenderingContext2D, radius: number): void {
+  ctx.beginPath();
+  const points = 3;
+  const outerR = radius;
+  const innerR = radius * 0.42;
+  for (let k = 0; k < points * 2; k++) {
+    const angle = (Math.PI * k) / points;
+    const dist = k % 2 === 0 ? outerR : innerR;
+    if (k === 0) ctx.moveTo(dist * Math.cos(angle), dist * Math.sin(angle));
+    else ctx.lineTo(dist * Math.cos(angle), dist * Math.sin(angle));
+  }
+  ctx.closePath();
+}
+
+/** Tracé d'une couronne de pointes (Spike). */
+export function drawSpikes(ctx: CanvasRenderingContext2D, radius: number, points = 12): void {
+  ctx.beginPath();
+  const outerR = radius * 1.4;
+  const innerR = radius * 0.95;
+  for (let k = 0; k < points * 2; k++) {
+    const angle = (Math.PI * k) / points;
+    const dist = k % 2 === 0 ? outerR : innerR;
+    if (k === 0) ctx.moveTo(dist * Math.cos(angle), dist * Math.sin(angle));
+    else ctx.lineTo(dist * Math.cos(angle), dist * Math.sin(angle));
   }
   ctx.closePath();
 }
