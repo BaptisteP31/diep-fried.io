@@ -1,12 +1,13 @@
 import './style.css';
-import type { ModeConfig, ServerMessage } from '@diep-fried/shared';
+import type { ModeConfig, PlayerCommand, ServerMessage } from '@diep-fried/shared';
 import { loadBindings } from './input/bindings';
 import { InputController } from './input/input-controller';
-import { GameConnection, gameSocketUrl } from './net/connection';
+import { GameConnection, gameSocketUrl, type RoomIntent } from './net/connection';
 import { worldToScreen } from './render/camera';
 import { drawMinimap } from './render/minimap';
 import { Renderer } from './render/renderer';
 import { SnapshotBuffer } from './state/snapshot-buffer';
+import { readStored } from './state/storage';
 import { ControlsModal } from './ui/controls-modal';
 import { DeathScreen } from './ui/death-screen';
 import { GameHud } from './ui/hud';
@@ -27,8 +28,8 @@ let buffer: SnapshotBuffer | null = null;
 let lastInput = '';
 let lastInputAt = 0;
 let currentRoomCode: string | null = null;
-let currentName = localStorage.getItem('diep-fried:name') ?? 'Sans nom';
-let lastServerTick = 0;
+let currentName = readStored('diep-fried:name') ?? 'Sans nom';
+let exitStatus: string | null = null;
 
 // Gestion du ping et de la latence
 let nextPingId = 1;
@@ -39,25 +40,23 @@ const controlsModal = new ControlsModal({
   onBindingsChanged: (newBindings) => {
     input.setBindings(newBindings);
   },
+  onVisibilityChanged: () => syncInputAvailability(),
 });
 
 // Écran de mort avec décompte de réapparition
 const deathScreen = new DeathScreen({
   onRespawn: () => {
-    connection.send({ t: 'command', command: { type: 'respawn' } });
+    if (!controlsModal.isVisible) sendCommand({ type: 'respawn' });
   },
 });
 
 // Menu d'accueil et salon
 const menu = new Menu({
   create: (name, mode) => {
-    currentName = name;
-    connection.send({ t: 'room.create', name, mode, options: {} });
+    enterRoom({ t: 'room.create', name, mode, options: {} });
   },
   join: (name, code, resumeToken) => {
-    currentName = name;
-    currentRoomCode = code;
-    connection.send({
+    enterRoom({
       t: 'room.join',
       name,
       code,
@@ -70,10 +69,10 @@ const menu = new Menu({
 // HUD complet de jeu (stats, évolutions, classement, ping)
 const hud = new GameHud({
   onUpgradeStat: (stat) => {
-    connection.send({ t: 'command', command: { type: 'upgradeStat', stat } });
+    sendCommand({ type: 'upgradeStat', stat });
   },
   onChooseClass: (classId) => {
-    connection.send({ t: 'command', command: { type: 'chooseClass', classId } });
+    sendCommand({ type: 'chooseClass', classId });
   },
   onToggleAutoFire: () => {
     input.toggleAutoFire();
@@ -86,21 +85,10 @@ const hud = new GameHud({
   onOpenControls: () => controlsModal.show(),
 });
 
-// Écoute des choix de classe cliqués dans le panneau d'évolution
-document.addEventListener('choose-class', (event: Event) => {
-  const custom = event as CustomEvent<string>;
-  if (custom.detail) {
-    connection.send({
-      t: 'command',
-      command: { type: 'chooseClass', classId: custom.detail },
-    });
-  }
-});
-
 // Contrôleur d'entrées clavier et souris
 const input = new InputController(canvas, {
   onStat: (stat) => {
-    connection.send({ t: 'command', command: { type: 'upgradeStat', stat } });
+    sendCommand({ type: 'upgradeStat', stat });
   },
   onToggle: (_action, _enabled) => {
     hud.setToggles(input.isAutoFire, input.isAutoSpin);
@@ -108,34 +96,66 @@ const input = new InputController(canvas, {
   bindings: loadBindings(),
 });
 
-// Connexion WebSocket au serveur
-let connection: GameConnection;
+// Connexion explicite ; les intentions du menu attendent welcome.
+const connection = new GameConnection(gameSocketUrl(location), {
+  onMessage: handleMessage,
+  onStateChange: (state, entering) => {
+    menu.setBusy(entering || state === 'joining');
+    if (state === 'connecting') menu.setStatus('Connexion…');
+    else if (state === 'joining') menu.setStatus('Entrée dans le salon…');
+  },
+  onClose: (reason) => {
+    resetRoom();
+    menu.showLobby();
+    menu.setStatus(
+      exitStatus ??
+        `Déconnecté (${reason}). Choisissez une entrée ou une reprise pour reconnecter.`,
+    );
+  },
+});
 
-function setupConnection(): void {
-  connection = new GameConnection(gameSocketUrl(location), {
-    onMessage: handleMessage,
-    onClose: (reason) => {
-      config = null;
-      buffer = null;
-      hud.hide();
-      minimapContainer.hidden = true;
-      deathScreen.hide();
-      menu.showLobby();
-      menu.setStatus(`Déconnecté (${reason}). Vous pouvez tenter de vous reconnecter.`);
-    },
-  });
+function enterRoom(intent: RoomIntent): void {
+  exitStatus = null;
+  if (connection.enter(intent)) currentName = intent.name || 'Sans nom';
 }
 
-setupConnection();
-menu.setStatus('Connexion…');
+function sendCommand(command: PlayerCommand): void {
+  if (config && !controlsModal.isVisible) connection.send({ t: 'command', command });
+}
 
-function handleMessage(message: ServerMessage): void {
+function syncInputAvailability(): void {
+  input.setEnabled(!!buffer?.latest()?.self.alive && !controlsModal.isVisible);
+}
+
+function resetRoom(): void {
+  config = null;
+  buffer?.clear();
+  buffer = null;
+  currentRoomCode = null;
+  lastInput = '';
+  lastInputAt = 0;
+  nextPingId = 1;
+  pingSentTimes.clear();
+  input.reset();
+  input.setEnabled(false);
+  renderer.reset();
+  hud.reset();
+  deathScreen.hide();
+  minimapContainer.hidden = true;
+}
+
+input.setEnabled(false);
+connection.connect();
+
+function handleMessage(message: ServerMessage, rejectedIntent?: RoomIntent): void {
   switch (message.t) {
     case 'welcome':
-      menu.setStatus('Connecté.');
+      if (connection.state === 'ready') menu.setStatus('Connecté.');
       return;
 
     case 'room.joined': {
+      resetRoom();
+      exitStatus = null;
       config = message.config;
       currentRoomCode = message.code;
       const tickMs = 1000 / config.tickRate;
@@ -145,38 +165,43 @@ function handleMessage(message: ServerMessage): void {
       menu.saveSession(message.code, message.resumeToken);
       menu.showRoom(message.code);
 
-      hud.show();
       hud.setRoomCode(message.code);
       minimapContainer.hidden = false;
       deathScreen.hide();
       return;
     }
 
-    case 'room.left':
-      config = null;
-      buffer = null;
-      currentRoomCode = null;
-      hud.hide();
-      minimapContainer.hidden = true;
-      deathScreen.hide();
-      return menu.showLobby();
+    case 'room.left': {
+      if (currentRoomCode) menu.clearSession(currentRoomCode);
+      exitStatus = {
+        requested: 'Vous avez quitté le salon. La session précédente est terminée.',
+        closed: 'Le salon a été fermé. La session précédente est terminée.',
+        kicked: 'Cette session a été remplacée ou expulsée. Aucune reprise automatique.',
+      }[message.reason];
+      resetRoom();
+      menu.showLobby();
+      menu.setStatus(exitStatus);
+      return;
+    }
 
     case 'snapshot':
-      lastServerTick = message.tick;
-      buffer?.push(message, performance.now());
+      if (!config || !buffer) return;
+      if (message.tick <= (buffer.latest()?.tick ?? -1)) return;
+      buffer.push(message, performance.now());
+      input.acknowledgeSequence(message.ackSeq);
+      syncInputAvailability();
 
       // Mise à jour de l'état du joueur et du HUD
+      hud.show();
       hud.updateSelf(message.self, currentName);
       hud.updateLeaderboard(message.leaderboard, message.self.playerId);
 
-      if (message.self.alive) {
-        deathScreen.hide();
-      } else {
-        deathScreen.setTick(message.tick);
-      }
+      deathScreen.syncSelf(message.self, message.tick, config.tickRate);
       return;
 
     case 'death':
+      input.setEnabled(false);
+      deathScreen.setTick(message.tick);
       deathScreen.show(message, config?.tickRate ?? 30);
       return;
 
@@ -192,17 +217,24 @@ function handleMessage(message: ServerMessage): void {
         hud.setPing(rtt);
       }
       if (message.tick !== null) {
-        lastServerTick = message.tick;
         deathScreen.setTick(message.tick);
       }
       return;
     }
 
-    case 'error':
-      if (message.code === 'room_not_found') {
-        menu.clearSession(currentRoomCode ?? undefined);
+    case 'error': {
+      const failedResume = rejectedIntent?.t === 'room.join' && rejectedIntent.resumeToken;
+      if (failedResume && (message.code === 'bad_message' || message.code === 'room_not_found')) {
+        menu.clearSession(rejectedIntent.code);
+        menu.setStatus(
+          `Reprise impossible : ${message.message}. Ancien jeton supprimé. Pour un nouveau joueur, choisissez « Nouvelle entrée (sans reprise) ».`,
+        );
+      } else {
+        menu.setStatus(`Erreur : ${message.message}`);
       }
-      return menu.setStatus(`Erreur : ${message.message}`);
+      if (message.fatal) exitStatus = `Connexion interrompue : ${message.message}`;
+      return;
+    }
   }
 }
 
@@ -229,10 +261,6 @@ function frame(now: number): void {
   const current = buffer?.sample(now) ?? null;
   renderer.draw(current, config, now);
 
-  if (current) {
-    deathScreen.setTick(current.tick);
-  }
-
   // Rendu de la minicarte
   if (minimapCtx) {
     drawMinimap(minimapCtx, 130, 130, current, config);
@@ -240,7 +268,7 @@ function frame(now: number): void {
 
   // Échantillonnage des commandes du joueur
   const own = current?.entities.find((entity) => entity.id === current.self.entityId);
-  if (own && renderer.camera && current?.self.alive) {
+  if (own && renderer.camera && buffer?.latest()?.self.alive) {
     const sample = input.sample(worldToScreen(renderer.camera, own), renderer.camera.scale, dt);
     const { seq: _seq, ...intent } = sample;
     const key = JSON.stringify(intent);

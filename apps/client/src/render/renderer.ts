@@ -51,6 +51,11 @@ export class Renderer {
     this.ctx = ctx;
   }
 
+  reset(): void {
+    this.camera = null;
+    this.fadeTracker.clear();
+  }
+
   /** Ajuste la résolution du canvas à sa taille affichée et à la densité de pixels. */
   resize(): void {
     const ratio = window.devicePixelRatio || 1;

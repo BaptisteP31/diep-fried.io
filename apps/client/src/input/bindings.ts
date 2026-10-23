@@ -93,11 +93,24 @@ export function loadBindings(storageOverride?: Storage): KeyBindings {
     const raw = storage.getItem(BINDINGS_STORAGE_KEY);
     if (!raw) return { ...DEFAULT_BINDINGS };
     const parsed = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return { ...DEFAULT_BINDINGS };
-    return { ...DEFAULT_BINDINGS, ...parsed };
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+      return { ...DEFAULT_BINDINGS };
+    if (!Object.values(parsed).every(isKeyAction)) return { ...DEFAULT_BINDINGS };
+    // saveBindings stocke la configuration complète, y compris les touches retirées.
+    return parsed as KeyBindings;
   } catch {
     return { ...DEFAULT_BINDINGS };
   }
+}
+
+function isKeyAction(value: unknown): value is KeyAction {
+  if (typeof value !== 'object' || value === null) return false;
+  const action = value as Record<string, unknown>;
+  if (action.kind === 'held')
+    return ['up', 'down', 'left', 'right', 'fire', 'alt'].includes(String(action.action));
+  if (action.kind === 'toggle')
+    return ['autoFire', 'autoSpin', 'upgradeTree'].includes(String(action.action));
+  return action.kind === 'stat' && STAT_IDS.includes(action.stat as StatId);
 }
 
 /**
