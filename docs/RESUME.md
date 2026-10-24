@@ -14,7 +14,11 @@ Les trois anciens statuts ont été revérifiés : `interrupted`, sans enfants a
 
 Le rappel récurrent a été désactivé après acceptation des trois relances. Le serveur de démonstration 8090 a été arrêté par le redémarrage T3 ; il sera reconstruit/redémarré après intégration finale, pas considéré comme disponible actuellement.
 
-## État intégré
+## Fin de reprise
+
+Les trois lots ont été livrés et intégrés : client `177411f`, revue `7ffcaae`, source `f47a1d2`. Le raccord du champ `flag.positionHidden` et la correction de progression après pilotage ont été réalisés par le coordinateur. Aucun lot interrompu ne reste à reprendre ; le timer demeure désactivé. Les anciennes informations de checkpoint ci-dessous sont conservées comme historique, pas comme tâches ouvertes.
+
+## État intégré à la pause
 
 Branche `integration`, HEAD avant ce checkpoint `67148fb`. Code AGPL-3.0-or-later, 54 classes, 11 modes et boss côté simulation. Dernier contrôle complet : 421 tests, typecheck, format et build verts. Scripts CI/smoke/load intégrés. Aucun push ni déploiement externe. `main` contient seulement la recherche initiale ; ne pas la présenter comme version actuelle.
 
