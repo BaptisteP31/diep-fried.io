@@ -145,6 +145,10 @@ export class ControlsModal {
         action: { kind: 'toggle', action: 'autoSpin' },
       },
       { label: 'Arbre d’évolution', action: { kind: 'toggle', action: 'upgradeTree' } },
+      {
+        label: 'Piloter / rendre un objectif allié proche',
+        action: { kind: 'toggle', action: 'possess' },
+      },
       ...SANDBOX_ACTIONS.map(({ action, label }) => ({
         label: `Bac à sable : ${label}`,
         action: { kind: 'sandbox', action } as KeyAction,

@@ -20,6 +20,7 @@ export class DeathScreen {
   private fromSnapshot = false;
   private currentTick = 0;
   private tickRate = 30;
+  private spectator = false;
 
   constructor(private readonly callbacks: DeathScreenCallbacks) {
     this.container = document.getElementById('death')!;
@@ -74,6 +75,8 @@ export class DeathScreen {
     this.deathInfo = null;
     this.currentTick = 0;
     this.fromSnapshot = false;
+    this.spectator = false;
+    this.container.classList.remove('spectator');
     this.respawnBtn.disabled = true;
   }
 
@@ -84,6 +87,12 @@ export class DeathScreen {
       return;
     }
     this.currentTick = tick;
+    this.tickRate = tickRate;
+    this.spectator = self.spectator === true;
+    this.container.classList.toggle('spectator', this.spectator);
+    document.getElementById('death-title')!.textContent = this.spectator
+      ? 'Spectateur'
+      : 'Vous êtes éliminé';
     if (!this.deathInfo) {
       this.show(
         { ...self, tick, killerName: null, respawnTick: self.respawnTick ?? tick },
@@ -92,6 +101,9 @@ export class DeathScreen {
       this.fromSnapshot = true;
     }
     this.deathInfo!.respawnTick = self.respawnTick;
+    if (this.spectator)
+      this.killerText.textContent =
+        'Éliminé ou arrivé en cours de manche · retour au prochain round';
     if (this.fromSnapshot) {
       this.statsText.textContent = `État actuel : score ${formatScore(self.score)} — Niveau ${self.level}`;
     }
@@ -107,6 +119,11 @@ export class DeathScreen {
 
   private updateRespawnCountdown(): void {
     if (!this.deathInfo) return;
+    if (this.spectator) {
+      this.respawnBtn.disabled = true;
+      this.respawnBtn.textContent = 'Réapparition au prochain round';
+      return;
+    }
     const respawnTick = this.deathInfo.respawnTick;
     if (respawnTick === null) {
       this.respawnBtn.disabled = true;

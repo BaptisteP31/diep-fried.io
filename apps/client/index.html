@@ -45,6 +45,15 @@
       <button id="hud-leave" type="button">Quitter le salon</button>
     </div>
 
+    <section id="match-hud" aria-label="État de la manche" hidden>
+      <strong id="match-title"></strong>
+      <p id="match-phase" role="status"></p>
+      <p id="match-scores"></p>
+      <ul id="match-objectives"></ul>
+      <button id="match-possess" type="button" hidden></button>
+    </section>
+    <div id="game-notices" role="status" aria-live="polite" hidden></div>
+
     <section id="sandbox-panel" aria-label="Commandes du bac à sable" hidden>
       <p>
         Bac à sable · effets validés par le serveur. Maintenir le raccourci de niveau pour répéter
@@ -174,7 +183,7 @@
 
     <!-- Écran de mort -->
     <div id="death" hidden>
-      <h2>Détruit</h2>
+      <h2 id="death-title">Vous êtes éliminé</h2>
       <p id="death-killer"></p>
       <p id="death-stats"></p>
       <button id="death-respawn" type="button">Réapparaître (Entrée)</button>

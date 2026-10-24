@@ -1007,3 +1007,114 @@ button:disabled {
 [hidden] {
   display: none !important;
 }
+
+/* Objectifs : panneaux compacts, aucune interception de la visée hors bouton. */
+#hud {
+  max-width: calc(100vw - 16rem);
+  flex-wrap: wrap;
+}
+#match-hud {
+  position: fixed;
+  top: 4.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(40vw, 38rem);
+  max-height: 35vh;
+  overflow-y: auto;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.45rem;
+  background: rgba(20, 28, 35, 0.88);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  z-index: 12;
+  pointer-events: none;
+}
+#match-hud p {
+  margin: 0.3rem 0;
+}
+#match-title {
+  color: #fff;
+}
+#match-phase {
+  color: #ffde83;
+}
+#match-hud[data-phase='finished'] {
+  border: 2px solid #ffde83;
+}
+#match-scores {
+  font-variant-numeric: tabular-nums;
+}
+#match-objectives {
+  list-style: none;
+  padding: 0;
+  margin: 0.3rem 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem 0.7rem;
+  font-size: 0.75rem;
+}
+#match-objectives li {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+}
+#match-possess {
+  pointer-events: auto;
+  font-size: 0.75rem;
+}
+#game-notices {
+  position: fixed;
+  bottom: 7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(50vw, 38rem);
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.4rem;
+  background: rgba(20, 28, 35, 0.85);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: pre-line;
+  pointer-events: none;
+  z-index: 12;
+}
+#death.spectator {
+  top: auto;
+  bottom: 11rem;
+  transform: translateX(-50%);
+  padding: 0.65rem 1rem;
+  max-width: 32rem;
+  background: rgba(20, 28, 35, 0.88);
+  border-color: #a8bcc8;
+  pointer-events: none;
+  font-size: 0.8rem;
+  gap: 0.4rem;
+}
+#death.spectator h2 {
+  font-size: 1.1rem;
+  color: #fff;
+}
+@media (max-width: 1200px) {
+  #match-hud {
+    top: 6.5rem;
+    width: 44vw;
+  }
+  #class-choices {
+    top: 6.5rem;
+  }
+  #sandbox-panel {
+    top: 6.5rem;
+  }
+  #match-objectives {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 800px) {
+  #match-hud {
+    top: 8rem;
+    width: 46vw;
+    font-size: 0.7rem;
+  }
+  #hud {
+    max-width: calc(100vw - 11rem);
+  }
+}

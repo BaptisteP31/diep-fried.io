@@ -17,6 +17,7 @@ export class Element extends EventTarget {
   parent: Element | null = null;
   role = '';
   dataset: Record<string, string> = {};
+  style: Record<string, string> = {};
   private classes = new Set<string>();
   classList = {
     add: (...names: string[]) => names.forEach((name) => this.classes.add(name)),

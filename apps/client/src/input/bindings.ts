@@ -6,7 +6,7 @@ import type { SandboxAction } from './sandbox';
  * Ainsi WASD correspond à ZQSD sur un clavier AZERTY sans configuration.
  */
 export type HeldAction = 'up' | 'down' | 'left' | 'right' | 'fire' | 'alt';
-export type ToggleAction = 'autoFire' | 'autoSpin' | 'upgradeTree';
+export type ToggleAction = 'autoFire' | 'autoSpin' | 'upgradeTree' | 'possess';
 export type KeyAction =
   | { kind: 'held'; action: HeldAction }
   | { kind: 'toggle'; action: ToggleAction }
@@ -33,6 +33,8 @@ export const DEFAULT_BINDINGS: Readonly<Record<string, KeyAction>> = {
   KeyE: toggle('autoFire'),
   KeyC: toggle('autoSpin'),
   KeyY: toggle('upgradeTree'),
+  KeyH: toggle('possess'),
+  KeyB: { kind: 'sandbox', action: 'summonBoss' },
   KeyK: { kind: 'sandbox', action: 'levelUp' },
   Backslash: { kind: 'sandbox', action: 'cycleClass' },
   KeyO: { kind: 'sandbox', action: 'selfDestruct' },
@@ -55,6 +57,7 @@ export const ACTION_DESCRIPTIONS: Readonly<Record<string, string>> = {
   autoFire: 'Tir automatique [E]',
   autoSpin: 'Rotation automatique [C]',
   upgradeTree: "Arbre d'évolution [Y]",
+  possess: 'Piloter / rendre un objectif allié proche [H]',
   healthRegen: '1 - Régénération de santé',
   maxHealth: '2 - Santé max',
   bodyDamage: '3 - Dégâts de corps',
@@ -115,9 +118,11 @@ function isKeyAction(value: unknown): value is KeyAction {
   if (action.kind === 'held')
     return ['up', 'down', 'left', 'right', 'fire', 'alt'].includes(String(action.action));
   if (action.kind === 'toggle')
-    return ['autoFire', 'autoSpin', 'upgradeTree'].includes(String(action.action));
+    return ['autoFire', 'autoSpin', 'upgradeTree', 'possess'].includes(String(action.action));
   if (action.kind === 'sandbox')
-    return ['levelUp', 'cycleClass', 'selfDestruct', 'toggleGod'].includes(String(action.action));
+    return ['levelUp', 'cycleClass', 'selfDestruct', 'toggleGod', 'summonBoss'].includes(
+      String(action.action),
+    );
   return action.kind === 'stat' && STAT_IDS.includes(action.stat as StatId);
 }
 

@@ -1,5 +1,6 @@
 import {
   getClassDefinition,
+  getSpecialClassDefinition,
   type BarrelDefinition,
   type EntityState,
   type ModeConfig,
@@ -11,6 +12,7 @@ import {
 } from '@diep-fried/shared';
 import { makeCamera, worldToScreen, type Camera } from './camera';
 import { drawWorldMap } from './world-map';
+import { drawObjectives } from './objectives';
 import { FadeTracker } from './fade-tracker';
 import { PALETTE, SHAPE_COLORS, SHINY_COLOR, TEAM_COLORS } from './palette';
 import { calculateBarrelRecoil, calculateRecoilOffset } from './recoil';
@@ -107,6 +109,18 @@ export class Renderer {
       this.fadeTracker.clear();
       return;
     }
+
+    if (config)
+      drawObjectives(
+        ctx,
+        {
+          point: (at) => worldToScreen(camera, at),
+          scale: camera.scale,
+          bounds: { x: 0, y: 0, width: this.width, height: this.height },
+        },
+        frame.match,
+        config,
+      );
 
     const currentTick = frame.tick;
     const ownTeam = own?.team ?? null;
@@ -324,9 +338,14 @@ export class Renderer {
       this.drawBarrel(barrel, r, currentTick, tank.barrelShots[i]);
     }
 
-    // Corps principal du tank (cercle coloré)
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    // Silhouette commune au catalogue serveur, y compris les boss et objectifs IA.
+    const body = getSpecialClassDefinition(tank.classId)?.body ?? 'circle';
+    if (body === 'circle') {
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+    } else {
+      polygonPath(ctx, { triangle: 3, square: 4, hexagon: 6 }[body], r);
+    }
     this.fillAndStroke(fill, PALETTE.outline, r * 0.12);
 
     // 2. Tourelles autonomes (auto) sur le corps, orientées selon tank.barrelAngles
