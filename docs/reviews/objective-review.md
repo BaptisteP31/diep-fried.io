@@ -170,3 +170,7 @@ Environnement : Node `v26.12.1`.
 - `rtk git diff --check` : **réussi**.
 
 Les corrections n'ajoutent aucune dépendance et ne modifient pas le lockfile.
+
+## Complément de la revue Claude arrivée tardivement
+
+La tâche Claude initialement limitée par l’API a été reprise automatiquement par T3 et a livré `0c9a264`. Ses variantes de traitement des drapeaux ne remplacent pas les conventions déjà testées ci-dessus. Un constat supplémentaire a été retenu : lors du retour d’un objectif piloté, le tank garé gardait un score et un niveau périmés après gains d’XP. Le coordinateur a reproduit ce cas (score tank 0 contre score joueur 100), ajouté une régression puis synchronisé le tank dans `release`. Le nouveau test vérifie niveau, score et santé maximale après le pilotage.
