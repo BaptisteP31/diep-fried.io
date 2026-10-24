@@ -4,6 +4,16 @@ Pause explicitement demandée le 23 octobre 2026, reprise autonome autorisée ap
 
 Timer T3 « Reprendre diep-fried.io après reset quota », ID `scheduled-task:command:mcp:70e88c7f-04d2-41a6-a244-26eece106add:schedule-task:diep-resume-after-quota-20261023`. Intervalle 4 h, premier passage **2026-10-23 22:51:12 UTC**, soit **24 octobre 00:51 à Paris**. Désactiver le timer dès la relance réussie ; s'il reste un blocage quota, conserver la prochaine tentative sans dupliquer de travail.
 
+## Reprise du 24 octobre
+
+Les trois anciens statuts ont été revérifiés : `interrupted`, sans enfants actifs. Leurs fichiers non commités sont toujours présents. Trois nouvelles tâches GPT-6.1-Sol (high) ont été lancées en isolation partagée avec chemin explicite vers chaque worktree existant :
+
+- `diep-resume-client-20261024-r2`
+- `diep-resume-objective-review-20261024-r3`
+- `diep-resume-source-20261024-r2`
+
+Le rappel récurrent a été désactivé après acceptation des trois relances. Le serveur de démonstration 8090 a été arrêté par le redémarrage T3 ; il sera reconstruit/redémarré après intégration finale, pas considéré comme disponible actuellement.
+
 ## État intégré
 
 Branche `integration`, HEAD avant ce checkpoint `67148fb`. Code AGPL-3.0-or-later, 54 classes, 11 modes et boss côté simulation. Dernier contrôle complet : 421 tests, typecheck, format et build verts. Scripts CI/smoke/load intégrés. Aucun push ni déploiement externe. `main` contient seulement la recherche initiale ; ne pas la présenter comme version actuelle.
