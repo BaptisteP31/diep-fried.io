@@ -31,7 +31,7 @@ export interface ObjectiveState {
   /** Indice stable de l'objectif dans `config.map.objectives`. */
   id: number;
   kind: ObjectiveKind;
-  /** Position courante (drapeau porté : position du porteur). */
+  /** Position courante ; drapeau masqué : position de base, voir `flag.positionHidden`. */
   x: number;
   y: number;
   radius: number;
@@ -54,6 +54,8 @@ export interface ObjectiveState {
   flag?: {
     status: FlagStatus;
     carrierId: PlayerId | null;
+    /** Porteur ennemi invisible : identité masquée, x/y remplacés par homeX/homeY (pas sa position). */
+    positionHidden?: boolean;
     homeX: number;
     homeY: number;
     /** Tick de retour automatique d'un drapeau tombé, sinon `null`. */

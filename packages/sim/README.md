@@ -337,6 +337,8 @@ immédiate), `restartDelayTicks` (300), `timeLimitTicks` (0 = illimité ; CTF/Br
   de base et objectifs recréés, joueurs réapparus dans le même tick (identifiants d'entité
   neufs). Tag rééquilibre les camps par identifiant croissant. Formes conservées. La
   configuration n'est jamais modifiée : la carte de `room.joined` reste valable.
+  L'intention de mouvement/tir est effacée, mais les séquences reçues/acquittées restent
+  monotones : le client doit envoyer une nouvelle entrée pour agir après le reset.
 
 ### Règles par mode
 
@@ -347,11 +349,16 @@ immédiate), `restartDelayTicks` (300), `timeLimitTicks` (0 = illimité ; CTF/Br
   qu'un camp détient tous les Dominators. Pas d'Arena Closers.
 - **Tag** (4 camps) : un joueur tué par un camp déclaré différent du sien (joueur, tir, garde
   de base) rejoint ce camp ; suicide et formes ne convertissent pas. Victoire quand un seul
-  camp contient tous les joueurs connectés. Un arrivant rejoint le camp le moins peuplé.
+  camp contient tous les joueurs connectés. En cours de round, un arrivant rejoint le camp
+  le moins peuplé parmi ceux encore présents ; il ne ressuscite pas un camp éliminé.
 - **CTF** : contact d'un ennemi avec un drapeau à la base ou tombé : prise (un drapeau par
   porteur). Mort, déconnexion ou `possess` du porteur : drapeau tombé sur place, retour
   automatique après 30 s ; un allié qui le touche le renvoie aussitôt. Capture : porter le
   drapeau adverse à moins de 120 unités de son propre drapeau **à la base**.
+  Le retour en attente dépose aussi les drapeaux portés ; les objectifs restent inactifs
+  jusqu'au reset de début de round. Pour un adversaire d'un porteur totalement invisible,
+  le snapshot masque `carrierId` et remplace les coordonnées du drapeau par sa base,
+  avec `flag.positionHidden: true`. Le porteur et ses alliés gardent la position réelle.
 - **Breakout** (convention propre au remake) : un territoire n'est capturé que par la présence
   exclusive de tanks vivants d'un seul camp, en 8 s ; l'avancement adverse doit d'abord
   redescendre ; plusieurs camps = gel (`contested`) ; personne = décroissance 0.05/s. La capture
@@ -378,6 +385,8 @@ kills/XP lui sont crédités. `self.entityId` et `self.possessing` désignent l'
 destruction de l'IA, la déconnexion ou la remise à zéro rendent le tank, posé au contact de
 l'IA par un mouvement balayé (pas de traversée de mur). Limite : la pose peut chevaucher un
 autre corps, séparé au tick suivant ; aucune protection n'est accordée.
+En attente, même possédé, un objectif ne se déplace pas et ne produit pas de tirs/drones ;
+ses projectiles déjà en vol sont inoffensifs.
 
 Toutes les IA (Dominators, vaisseaux-mères, boss) sont des **tanks ordinaires** de classe
 spéciale (`TankState.playerId === null`), endommageables, visibles dans les snapshots, avec
@@ -427,7 +436,9 @@ Coefficients expérimentaux nommés : `OBJECTIVE_BALANCE`, `AI_BALANCE`, `SHAPE_
   `players`, `result`, `scores` (`team`, `score`, `players`) et `objectives`, plus `survivors`
   et `safeZone` en Survival. `ObjectiveState` : `id`, `kind`, `x`, `y`, `radius`, `team`,
   `entityId`, `progress` et, selon le type, `health`/`maxHealth`/`possessedBy`, `capturingTeam`/`contested`,
-  ou `flag` (`status`, `carrierId`, `homeX`, `homeY`, `returnTick`).
+  ou `flag` (`status`, `carrierId`, `positionHidden?`, `homeX`, `homeY`, `returnTick`).
+  Si `positionHidden` est vrai, ne pas dessiner un drapeau porté à `x/y` : ces coordonnées
+  sont un repli public à la base, pas la position du porteur.
 - `SelfState.spectator?`, `SelfState.possessing?` ; `PlayerCommand { type: 'possess' }` ;
   action Sandbox `summonBoss` (`SANDBOX_ACTIONS`).
 - `SimEvent` : `matchPhase`, `objective` (actions `captured`, `neutralized`, `pickup`, `drop`,
@@ -443,8 +454,7 @@ Pas d'Arena Closers ni de fermeture d'arène ; pas de pathfinding ; pas d'IA tac
 d'esquive, de prédiction de tir ni de coordination). Rendu client non implémenté pour les
 objectifs, drapeaux, territoires, zone sûre, silhouettes spéciales et HUD de round : le client
 actuel dessine les IA comme des tanks circulaires avec leurs canons. Un porteur de drapeau ne
-subit aucun ralentissement. En `waiting`, un drapeau porté n'est plus mis à jour (remis à zéro
-au départ du round). Le Tag accepte qu'un arrivant ranime un camp vide. Survival n'a pas de
+subit aucun ralentissement. Survival n'a pas de
 file d'attente de lobby. Les coefficients ne sont pas calibrés par playtest.
 
 Mesures `bench/load.mjs` (900 ticks, 8 joueurs, 200 formes, cette machine, indicatives) :
@@ -458,3 +468,5 @@ victoire unique, gel des dégâts et remise à zéro, retour en attente, convers
 retour/capture/délai CTF, territoires contestés et points, spectateurs et zone Survival,
 destruction et pilotage du vaisseau-mère, refus de `possess`, attaque des cinq boss, mort de boss
 et nettoyage de ses drones, bornes de population, nid/variantes et rejeu déterministe.
+`test/objective-review.test.ts` ajoute les régressions et contrôles de la revue indépendante ;
+preuves avant/après correction et limites dans `../../docs/reviews/objective-review.md`.

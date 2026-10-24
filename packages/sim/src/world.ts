@@ -279,13 +279,19 @@ class World implements Simulation {
 
   addPlayer(playerId: PlayerId, { name }: PlayerProfile): void {
     if (this.players.has(playerId)) return;
+    // Un join ne ressuscite pas un camp vide de Tag pendant le round.
+    let context = this.context;
+    if (this.rule === 'conversion' && this.match?.phase === 'playing') {
+      const active = this.config.teams.filter((team) => (this.teamSizes.get(team.id) ?? 0) > 0);
+      if (active.length) context = { ...context, config: { ...this.config, teams: active } };
+    }
     const level = Math.max(
       1,
       Math.min(this.config.progression.maxLevel, this.config.progression.startLevel),
     );
     this.players.set(playerId, {
       name,
-      team: MODE_RULES[this.config.mode].assignTeam(this.context, playerId),
+      team: MODE_RULES[this.config.mode].assignTeam(context, playerId),
       input: null,
       receivedSeq: 0,
       appliedSeq: 0,
@@ -642,6 +648,11 @@ class World implements Simulation {
     // Sanctuaire de base pour les joueurs ; objectifs IA protégés hors phase de jeu.
     const shielded = player.god || (tank.ai ? this.aiShielded(tank.ai) : this.inOwnBase(tank));
     tank.spawnProtected = this.tick < tank.protectedUntil || shielded;
+    if (tank.ai && this.aiShielded(tank.ai)) {
+      tank.vx = tank.vy = 0;
+      tank.activeBarrels.fill(false);
+      return;
+    }
     if (input && (input.aim.x !== 0 || input.aim.y !== 0))
       tank.angle = Math.atan2(input.aim.y, input.aim.x);
     const move = input?.move ?? { x: 0, y: 0 };
@@ -1323,6 +1334,12 @@ class World implements Simulation {
   private canDamage(a: Body, b: Body): boolean {
     // Podium : plus aucun dégât, donc ni XP ni objectif après la victoire.
     if (this.match?.phase === 'finished') return false;
+    // Les tirs déjà en vol d'un objectif deviennent aussi inoffensifs en attente.
+    for (const body of [a, b]) {
+      if (body.kind !== 'projectile' || body.base) continue;
+      const ai = this.ais.get(body.ownerPlayerId);
+      if (ai && this.aiShielded(ai)) return false;
+    }
     if ((a.kind === 'tank' && a.spawnProtected) || (b.kind === 'tank' && b.spawnProtected))
       return false;
     // Produire des drones ne révèle pas Manager ; spawn/god interdisent leurs
@@ -1905,6 +1922,11 @@ class World implements Simulation {
    */
   private think(ai: Ai): void {
     const tank = ai.tank;
+    if (this.aiShielded(ai)) {
+      ai.pilot.input = null;
+      ai.targetId = null;
+      return;
+    }
     if (ai.possessedBy !== null) {
       const input = this.players.get(ai.possessedBy)?.input;
       ai.pilot.input = input ? { ...input, move: { ...input.move }, aim: { ...input.aim } } : null;
@@ -2232,6 +2254,9 @@ class World implements Simulation {
 
   private setPhase(phase: MatchPhase, endTick: number | null): void {
     const match = this.match!;
+    if (phase === 'waiting') {
+      for (const [id, player] of this.players) this.dropCarriedFlag(id, player.tank ?? player);
+    }
     match.phase = phase;
     match.phaseTick = this.tick;
     match.endTick = endTick;
@@ -2325,6 +2350,7 @@ class World implements Simulation {
       player.spent = 0;
       player.god = false;
       player.spectator = false;
+      player.input = null;
     }
     match.scores = new Map(this.config.teams.map((team) => [team.id, 0]));
     match.result = null;
@@ -2517,7 +2543,10 @@ class World implements Simulation {
     );
   }
 
-  private objectiveState(objective: Objective): ObjectiveState {
+  private objectiveState(
+    objective: Objective,
+    hiddenEnemy: (body: Body | undefined) => boolean,
+  ): ObjectiveState {
     const base = {
       id: objective.id,
       kind: objective.site.kind,
@@ -2525,21 +2554,25 @@ class World implements Simulation {
       team: objective.team,
     };
     const { flag, territory } = objective;
-    if (flag)
+    if (flag) {
+      const hidden =
+        flag.carrier !== null && hiddenEnemy(this.players.get(flag.carrier)?.tank ?? undefined);
       return {
         ...base,
-        x: flag.x,
-        y: flag.y,
+        x: hidden ? flag.homeX : flag.x,
+        y: hidden ? flag.homeY : flag.y,
         entityId: null,
         progress: flag.status === 'home' ? 1 : 0,
         flag: {
           status: flag.status,
-          carrierId: flag.carrier,
+          carrierId: hidden ? null : flag.carrier,
           homeX: flag.homeX,
           homeY: flag.homeY,
           returnTick: flag.returnTick,
+          ...(hidden ? { positionHidden: true } : {}),
         },
       };
+    }
     if (territory)
       return {
         ...base,
@@ -2567,7 +2600,7 @@ class World implements Simulation {
     };
   }
 
-  private matchState(): MatchState | undefined {
+  private matchState(hiddenEnemy: (body: Body | undefined) => boolean): MatchState | undefined {
     const match = this.match;
     if (!match) return undefined;
     const state: MatchState = {
@@ -2583,7 +2616,7 @@ class World implements Simulation {
         score: match.scores.get(team.id) ?? 0,
         players: this.teamSizes.get(team.id) ?? 0,
       })),
-      objectives: match.objectives.map((objective) => this.objectiveState(objective)),
+      objectives: match.objectives.map((objective) => this.objectiveState(objective, hiddenEnemy)),
     };
     if (this.rule === 'survival') {
       state.survivors = [...this.players]
@@ -2675,7 +2708,7 @@ class World implements Simulation {
     }
     const floor = scoreForLevel(player.level);
     const ceiling = scoreForLevel(player.level + 1);
-    const match = this.matchState();
+    const match = this.matchState(hiddenEnemy);
     return {
       tick: this.tick,
       ackSeq: player.appliedSeq,
