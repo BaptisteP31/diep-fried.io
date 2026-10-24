@@ -25,6 +25,14 @@ Pour une instance modifiée accessible en réseau, proposer aux utilisateurs l�
 
 [Architecture](docs/architecture.md), [jalons](docs/DEVELOPMENT.md), [spécification](docs/specification/scope.md), [vérification initiale](docs/qa-first-playable.md).
 
+## Docker Compose et réseau local
+
+```sh
+docker compose up -d --build
+```
+
+Le jeu est accessible sur `http://IP_DE_LA_MACHINE:8080` depuis les appareils du réseau local. HTTP et WebSocket utilisent le même port. Pour choisir un autre port : `GAME_PORT=8090 docker compose up -d --build`. Logs : `docker compose logs -f game` ; arrêt : `docker compose down`.
+
 ## Modes et commandes
 
 FFA, Sandbox, 2 équipes, 4 équipes, Maze, Domination, Tag, Capture du drapeau, Breakout, Survival et Mothership. Les modes à objectifs demandent deux joueurs pour commencer.

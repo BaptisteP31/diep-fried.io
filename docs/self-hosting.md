@@ -1,6 +1,6 @@
 # Auto-hébergement
 
-Le serveur HTTP et WebSocket est un processus unique, sans base de données. Les salons, joueurs et jetons sont en mémoire ; un redémarrage les perd. Le serveur utilise encore `createPlaceholderSimulation` par défaut : tanks immobiles, sans formes ni projectiles. L'injection `createGameServer(config, simulationFactory)` reste disponible pour intégrer la simulation complète.
+Le serveur HTTP et WebSocket est un processus unique, sans base de données. Les salons, joueurs et jetons sont en mémoire ; un redémarrage les perd. La simulation complète est utilisée par défaut.
 
 ## Lancement local
 
@@ -14,6 +14,22 @@ HOST=127.0.0.1 PORT=8080 npm start
 ```
 
 Ouvrir `http://localhost:8080`. Le client construit est servi par le même port que `/ws` et `/healthz`. `STATIC_DIR=''` désactive les fichiers statiques. Pour le développement, `npm run dev` lance le proxy Vite sur `http://localhost:5173`.
+
+## Docker Compose sur le réseau local
+
+```sh
+docker compose up -d --build
+docker compose ps
+docker compose logs -f game
+```
+
+Le port 8080 est publié sur **toutes les interfaces IPv4** (`0.0.0.0`). Les amis du même réseau ouvrent `http://IP_DE_LA_MACHINE:8080` et rejoignent le même salon via son code ou le lien partagé. Le serveur HTTP et la WebSocket utilisent ce seul port. Le contrôle d’origine conserve le même hôte/port que la page : aucune IP locale n’est codée en dur.
+
+Pour changer le port externe : `GAME_PORT=8090 docker compose up -d --build`. Si le pare-feu local filtre les connexions entrantes, autoriser le port TCP choisi sur le réseau local. Cela ne configure pas de redirection Internet sur le routeur.
+
+Arrêt : `docker compose down`. Reconstruction après modification : `docker compose up -d --build`. La politique `unless-stopped` redémarre le service avec Docker ; les salons restent en mémoire et sont perdus au redémarrage du conteneur. Le healthcheck du Dockerfile reste actif.
+
+Les variables `DIEP_FRIED_VERSION` et `DIEP_FRIED_REVISION` peuvent être fournies au build ; `MAX_CONNECTIONS_PER_IP` vaut 32 dans Compose. Aucun volume n’est requis. L’archive source exportée inclut les fichiers Compose.
 
 ## Docker
 

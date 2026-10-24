@@ -27,6 +27,7 @@ const ROOT_FILES = [
   'README.md',
   'LICENSE',
   'Dockerfile',
+  'compose.yml',
   '.dockerignore',
   '.gitignore',
   '.editorconfig',
