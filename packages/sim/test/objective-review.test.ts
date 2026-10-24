@@ -267,6 +267,31 @@ describe('independent objective review regressions', () => {
 });
 
 describe('objective review: disconnects, rounds and AI invariants', () => {
+  it('synchronizes earned XP and level back to the parked tank after possession', () => {
+    const c = fortresses('mothership');
+    c.progression.startLevel = 1;
+    const s = create(c);
+    const originalHealth = own(s).maxHealth;
+    s.queueCommand(1, { type: 'possess' });
+    s.step();
+    expect(s.snapshotFor(1)!.self.possessing).toBeDefined();
+    for (let i = 0; i < 900 && s.snapshotFor(2)!.self.alive; i++) {
+      const target = own(s, 2);
+      const pilot = own(s);
+      input(s, 1, { fire: true, aim: { x: target.x - pilot.x, y: target.y - pilot.y } });
+      s.step();
+    }
+    expect(s.snapshotFor(2)!.self.alive).toBe(false);
+    expect(s.snapshotFor(1)!.self.score).toBeGreaterThan(0);
+    s.queueCommand(1, { type: 'possess' });
+    s.step();
+    const self = s.snapshotFor(1)!.self;
+    const restored = own(s);
+    expect(restored.score).toBe(self.score);
+    expect(restored.level).toBe(self.level);
+    expect(restored.maxHealth).toBeGreaterThan(originalHealth);
+  });
+
   it.each(['domination', 'tag', 'ctf', 'breakout', 'survival', 'mothership'] as const)(
     '%s: waits for two participants and completes two rounds with a fresh third round',
     (mode) => {

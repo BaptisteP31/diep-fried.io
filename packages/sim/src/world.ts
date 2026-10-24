@@ -1857,6 +1857,7 @@ class World implements Simulation {
     player.x = tank.x;
     player.y = tank.y;
     this.bodies.set(tank.id, tank);
+    this.syncTank(player);
     this.events.push({ type: 'possess', playerId, entityId: null });
   }
 
