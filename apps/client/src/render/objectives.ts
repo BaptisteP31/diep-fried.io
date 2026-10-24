@@ -42,6 +42,8 @@ export function drawObjectives(
     ctx.stroke();
   }
   for (const objective of match.objectives) {
+    // Le serveur conserve le statut porté mais ne publie pas la position d'un porteur camouflé.
+    if (objective.flag?.positionHidden) continue;
     const at = point(objective);
     const radius = minimap ? 5 : Math.max(14, objective.radius * scale + 7);
     const teamColor = color(objective.team);

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolveModeConfig } from '@diep-fried/shared';
 import { Renderer } from '../src/render/renderer';
 import { drawMinimap } from '../src/render/minimap';
+import { drawObjectives } from '../src/render/objectives';
 import { match, snapshot, tank } from './helpers/match';
 
 function context() {
@@ -34,6 +35,51 @@ function renderer() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('appels Canvas réels du renderer et de la minicarte', () => {
+  it.each([false, true])(
+    'masque un drapeau camouflé sans marqueur de repli (minimap=%s)',
+    (minimap) => {
+      const { ctx, calls } = context();
+      const objective = {
+        id: 0,
+        kind: 'flag' as const,
+        x: 600,
+        y: 600,
+        radius: 30,
+        team: 1,
+        progress: 0,
+        entityId: null,
+        flag: {
+          status: 'carried' as const,
+          carrierId: null,
+          homeX: 600,
+          homeY: 600,
+          returnTick: null,
+          positionHidden: true,
+        },
+      };
+      const projection = {
+        point: (p: { x: number; y: number }) => p,
+        scale: 1,
+        bounds: { x: 0, y: 0, width: 1200, height: 800 },
+        minimap,
+      };
+      drawObjectives(ctx, projection, match({ objectives: [objective] }), resolveModeConfig('ctf'));
+      expect(
+        calls.some((c) => c.name === 'arc' || c.name === 'fillText' || c.name === 'strokeText'),
+      ).toBe(false);
+      calls.length = 0;
+      drawObjectives(
+        ctx,
+        projection,
+        match({
+          objectives: [{ ...objective, flag: { ...objective.flag, positionHidden: false } }],
+        }),
+        resolveModeConfig('ctf'),
+      );
+      expect(calls.some((c) => c.name === 'arc')).toBe(true);
+    },
+  );
+
   it('dessine les quatre objectifs globaux hors FOV et les drapeaux à leur position courante', () => {
     const { ctx, calls } = context();
     const config = resolveModeConfig('domination', { arenaSize: 'small' });
