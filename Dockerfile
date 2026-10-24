@@ -8,13 +8,18 @@ COPY packages/sim/package.json packages/sim/package.json
 RUN npm ci --ignore-scripts
 
 FROM dependencies AS build
+RUN apk add --no-cache tar
+ARG DIEP_FRIED_VERSION=dev
+ARG DIEP_FRIED_REVISION
 COPY . .
-RUN npm run build
+RUN DIEP_FRIED_VERSION="$DIEP_FRIED_VERSION" DIEP_FRIED_REVISION="$DIEP_FRIED_REVISION" npm run build
 
 FROM dependencies AS production-dependencies
 RUN npm ci --omit=dev --ignore-scripts --workspace=@diep-fried/server
 
 FROM node:22-alpine AS runtime
+ARG DIEP_FRIED_VERSION=dev
+ENV DIEP_FRIED_VERSION=$DIEP_FRIED_VERSION
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080
 WORKDIR /app
 COPY --from=production-dependencies /app/node_modules ./node_modules
