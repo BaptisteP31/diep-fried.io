@@ -1,14 +1,16 @@
-import type {
-  BotDifficulty,
-  EntityState,
-  ModeConfig,
-  PlayerCommand,
-  PlayerId,
-  PlayerInput,
-  Rect,
-  SnapshotPayload,
-  TankState,
-  Vec2,
+import {
+  LIMITS,
+  type BotDifficulty,
+  type EntityState,
+  type ModeConfig,
+  type PlayerCommand,
+  type PlayerId,
+  type PlayerInput,
+  type Rect,
+  type SnapshotPayload,
+  type TankState,
+  type TeamId,
+  type Vec2,
 } from '@diep-fried/shared';
 import { Rng } from '../rng';
 import { BOT_BUILDS, type BuildArchetype } from './bot-builds';
@@ -47,6 +49,8 @@ export class BotBrain {
   private readonly profile: DifficultyProfile;
   private seq = 0;
   private lastThinkTick = -1;
+  private lastAlive = false;
+  private currentTeam: TeamId = 0;
 
   private currentMove: Vec2 = { x: 0, y: 0 };
   private currentAim: Vec2 = { x: 100, y: 0 };
@@ -77,6 +81,29 @@ export class BotBrain {
 
   get currentSeq(): number {
     return this.seq;
+  }
+
+  get team(): TeamId {
+    return this.currentTeam;
+  }
+
+  reset(): void {
+    this.lastThinkTick = -1;
+    this.lastAlive = false;
+    this.currentTeam = 0;
+    this.currentMove = { x: 0, y: 0 };
+    this.currentAim = { x: 100, y: 0 };
+    this.currentFire = false;
+    this.aimAngle = 0;
+    this.wanderTarget = null;
+    this.wanderExpiresTick = 0;
+    this.waypoints = [];
+    this.currentDestination = null;
+    this.lastX = 0;
+    this.lastY = 0;
+    this.stuckTicks = 0;
+    this.unstickUntilTick = 0;
+    this.unstickMove = { x: 0, y: 0 };
   }
 
   step(
@@ -126,10 +153,14 @@ export class BotBrain {
   ): void {
     // 1. Check if dead or spectator
     if (!snapshot.self.alive) {
+      this.lastAlive = false;
       this.currentMove = { x: 0, y: 0 };
       this.currentFire = false;
       this.waypoints = [];
       this.currentDestination = null;
+      this.wanderTarget = null;
+      this.stuckTicks = 0;
+      this.unstickUntilTick = 0;
 
       // In Survival mode, spectators wait for the next round
       if (snapshot.self.spectator) {
@@ -152,9 +183,36 @@ export class BotBrain {
     );
     if (!selfTank) return;
 
+    this.currentTeam = selfTank.team;
+
+    // Detect (re)spawn: reset tactical & stuck trackers
+    if (!this.lastAlive) {
+      this.lastAlive = true;
+      this.lastX = selfTank.x;
+      this.lastY = selfTank.y;
+      this.stuckTicks = 0;
+      this.unstickUntilTick = 0;
+      this.waypoints = [];
+      this.currentDestination = null;
+      this.wanderTarget = null;
+    }
+
     const selfPos = { x: selfTank.x, y: selfTank.y };
     const botTeam = selfTank.team;
     const healthRatio = selfTank.health / Math.max(1, selfTank.maxHealth);
+
+    const isInsideEnemyBase = (pos: Vec2): boolean => {
+      return config.map.zones.some(
+        (z) =>
+          z.kind === 'base' &&
+          z.team !== 0 &&
+          z.team !== botTeam &&
+          pos.x >= z.area.x &&
+          pos.x <= z.area.x + z.area.width &&
+          pos.y >= z.area.y &&
+          pos.y <= z.area.y + z.area.height,
+      );
+    };
 
     // 4. Stuck detection & unsticking
     const moved = Math.hypot(selfTank.x - this.lastX, selfTank.y - this.lastY);
@@ -215,6 +273,8 @@ export class BotBrain {
     let combatTarget: EntityState | null = null;
     let isFleeing = false;
 
+    const friendlyBase = config.map.zones.find((z) => z.kind === 'base' && z.team === botTeam);
+
     // Flee condition: low HP with nearby threats, or low level near boss
     if (
       healthRatio < this.profile.fleeHealthThreshold &&
@@ -243,7 +303,6 @@ export class BotBrain {
       combatTarget = closestThreat;
 
       // If team mode, retreat towards team base
-      const friendlyBase = config.map.zones.find((z) => z.kind === 'base' && z.team === botTeam);
       if (friendlyBase) {
         destination = {
           x: friendlyBase.area.x + friendlyBase.area.width / 2,
@@ -265,6 +324,20 @@ export class BotBrain {
           ),
         };
       }
+
+      // In Survival mode with active safe zone, do not flee outside into the storm
+      if (snapshot.match?.safeZone) {
+        const safe = snapshot.match.safeZone;
+        const dFromSafe = Math.hypot(destination.x - safe.x, destination.y - safe.y);
+        const maxSafeDist = safe.radius * 0.75;
+        if (dFromSafe > maxSafeDist) {
+          const ratio = maxSafeDist / (dFromSafe || 1);
+          destination = {
+            x: safe.x + (destination.x - safe.x) * ratio,
+            y: safe.y + (destination.y - safe.y) * ratio,
+          };
+        }
+      }
     }
 
     // If not fleeing, evaluate Mode Objectives
@@ -273,7 +346,7 @@ export class BotBrain {
       if (snapshot.match.safeZone) {
         const safe = snapshot.match.safeZone;
         const d = Math.hypot(selfPos.x - safe.x, selfPos.y - safe.y);
-        if (d > safe.radius * 0.8) {
+        if (d > safe.radius * 0.75) {
           destination = { x: safe.x, y: safe.y };
         }
       }
@@ -284,19 +357,51 @@ export class BotBrain {
           (o) => o.kind === 'flag' && o.flag?.carrierId === this.botId,
         );
         if (carried && carried.flag) {
-          destination = { x: carried.flag.homeX, y: carried.flag.homeY };
+          // Carrying enemy flag: bring back to own team flag's home to score!
+          const ownFlag = snapshot.match.objectives.find(
+            (o) => o.kind === 'flag' && o.team === botTeam,
+          );
+          if (ownFlag && ownFlag.flag) {
+            destination = { x: ownFlag.flag.homeX, y: ownFlag.flag.homeY };
+          } else if (friendlyBase) {
+            destination = {
+              x: friendlyBase.area.x + friendlyBase.area.width / 2,
+              y: friendlyBase.area.y + friendlyBase.area.height / 2,
+            };
+          }
         } else {
+          // If our own flag is dropped (and not positionHidden), recover it
           const droppedHome = snapshot.match.objectives.find(
-            (o) => o.kind === 'flag' && o.team === botTeam && o.flag?.status === 'dropped',
+            (o) =>
+              o.kind === 'flag' &&
+              o.team === botTeam &&
+              o.flag?.status === 'dropped' &&
+              !o.flag?.positionHidden,
           );
           if (droppedHome) {
             destination = { x: droppedHome.x, y: droppedHome.y };
           } else {
-            const enemyFlag = snapshot.match.objectives.find(
-              (o) => o.kind === 'flag' && o.team !== botTeam,
+            // Pick up enemy flag: must not be carried, not positionHidden, and not inside an enemy base
+            const pickableEnemyFlags = snapshot.match.objectives.filter(
+              (o) =>
+                o.kind === 'flag' &&
+                o.team !== botTeam &&
+                o.flag?.status !== 'carried' &&
+                !o.flag?.positionHidden &&
+                !isInsideEnemyBase({ x: o.x, y: o.y }),
             );
-            if (enemyFlag) {
-              destination = { x: enemyFlag.x, y: enemyFlag.y };
+            if (pickableEnemyFlags.length > 0) {
+              let closest = pickableEnemyFlags[0]!;
+              let minDist = Math.hypot(closest.x - selfPos.x, closest.y - selfPos.y);
+              for (let i = 1; i < pickableEnemyFlags.length; i++) {
+                const f = pickableEnemyFlags[i]!;
+                const d = Math.hypot(f.x - selfPos.x, f.y - selfPos.y);
+                if (d < minDist) {
+                  minDist = d;
+                  closest = f;
+                }
+              }
+              destination = { x: closest.x, y: closest.y };
             }
           }
         }
@@ -364,7 +469,7 @@ export class BotBrain {
           }
         }
         combatTarget = bestEnemy;
-        if (!destination) {
+        if (!destination && !isInsideEnemyBase(bestEnemy)) {
           destination = { x: bestEnemy.x, y: bestEnemy.y };
         }
       } else if (shapes.length > 0) {
@@ -391,13 +496,21 @@ export class BotBrain {
       if (
         !this.wanderTarget ||
         snapshot.tick >= this.wanderExpiresTick ||
-        Math.hypot(this.wanderTarget.x - selfPos.x, this.wanderTarget.y - selfPos.y) < 80
+        Math.hypot(this.wanderTarget.x - selfPos.x, this.wanderTarget.y - selfPos.y) < 80 ||
+        isInsideEnemyBase(this.wanderTarget)
       ) {
         const margin = 250;
-        this.wanderTarget = {
+        let candidate: Vec2 = {
           x: this.rng.range(margin, config.arena.width - margin),
           y: this.rng.range(margin, config.arena.height - margin),
         };
+        for (let attempt = 0; attempt < 5 && isInsideEnemyBase(candidate); attempt++) {
+          candidate = {
+            x: this.rng.range(margin, config.arena.width - margin),
+            y: this.rng.range(margin, config.arena.height - margin),
+          };
+        }
+        this.wanderTarget = candidate;
         this.wanderExpiresTick = snapshot.tick + this.rng.int(100, 240);
       }
       destination = this.wanderTarget;
@@ -421,9 +534,10 @@ export class BotBrain {
       while (diff > Math.PI) diff -= Math.PI * 2;
 
       this.aimAngle += diff * this.profile.aimSmoothing;
+      const aimDist = Math.min(LIMITS.maxAimDistance - 10, Math.max(100, targetDist));
       this.currentAim = {
-        x: Math.cos(this.aimAngle) * Math.max(100, targetDist),
-        y: Math.sin(this.aimAngle) * Math.max(100, targetDist),
+        x: Math.cos(this.aimAngle) * aimDist,
+        y: Math.sin(this.aimAngle) * aimDist,
       };
 
       const aimError = Math.abs(diff);

@@ -101,13 +101,21 @@ const PRESETS: Record<ModeId, Omit<ModeConfig, 'mode'>> = {
 /** Construit la configuration complète d'un salon. `options` doit déjà être validé. */
 export function resolveModeConfig(mode: ModeId, options: RoomOptions = {}): ModeConfig {
   const preset = PRESETS[mode];
-  const side = options.arenaSize ? ARENA_SIZES[options.arenaSize] : preset.arena.width;
+  const side =
+    options.arenaSize && options.arenaSize in ARENA_SIZES
+      ? ARENA_SIZES[options.arenaSize]
+      : preset.arena.width;
   const arena = options.arenaSize ? { width: side, height: side } : { ...preset.arena };
-  const density = SHAPE_DENSITY[options.shapeDensity ?? 'normal'];
-  const maxPlayers = Math.min(
-    MAX_PLAYERS_LIMIT,
-    Math.max(1, Math.floor(options.maxPlayers ?? preset.maxPlayers)),
-  );
+  const density =
+    options.shapeDensity && options.shapeDensity in SHAPE_DENSITY
+      ? SHAPE_DENSITY[options.shapeDensity]
+      : SHAPE_DENSITY.normal;
+
+  const rawMaxPlayers =
+    typeof options.maxPlayers === 'number' && Number.isFinite(options.maxPlayers)
+      ? Math.floor(options.maxPlayers)
+      : preset.maxPlayers;
+  const maxPlayers = Math.min(MAX_PLAYERS_LIMIT, Math.max(1, rawMaxPlayers));
 
   const defaultDifficulty: BotDifficulty = 'normal';
   const botDifficulty: BotDifficulty =

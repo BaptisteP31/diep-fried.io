@@ -60,5 +60,26 @@ describe('resolveModeConfig', () => {
     // Valeur négative ou invalide bornée
     const clampedNeg = resolveModeConfig('ffa', { botCount: -5 });
     expect(clampedNeg.bots).toEqual({ count: 0, difficulty: 'normal' });
+
+    // Valeurs NaN, non finies et types invalides
+    const nanMaxPlayers = resolveModeConfig('ffa', { maxPlayers: Number.NaN });
+    expect(nanMaxPlayers.maxPlayers).toBe(16);
+    expect(nanMaxPlayers.bots).toEqual({ count: 5, difficulty: 'normal' });
+
+    const nanBotCount = resolveModeConfig('ffa', { botCount: Number.NaN });
+    expect(nanBotCount.bots).toEqual({ count: 5, difficulty: 'normal' });
+
+    const floatBotCount = resolveModeConfig('ffa', { botCount: 3.9 });
+    expect(floatBotCount.bots).toEqual({ count: 3, difficulty: 'normal' });
+
+    const invalidDifficulty = resolveModeConfig('ffa', {
+      botDifficulty: 'superhard' as unknown as 'normal',
+    });
+    expect(invalidDifficulty.bots?.difficulty).toBe('normal');
+
+    const invalidDensity = resolveModeConfig('ffa', {
+      shapeDensity: 'mega' as unknown as 'normal',
+    });
+    expect(Number.isFinite(invalidDensity.shapes.targetCount)).toBe(true);
   });
 });

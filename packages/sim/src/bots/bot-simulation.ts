@@ -88,8 +88,8 @@ export class BotSimulation implements Simulation {
     const isNew = !this.humanPlayers.has(playerId);
     if (isNew) {
       this.humanPlayers.add(playerId);
-      this.underlying.addPlayer(playerId, profile);
       this.synchronizeBotPopulation();
+      this.underlying.addPlayer(playerId, profile);
     }
   }
 
@@ -99,6 +99,8 @@ export class BotSimulation implements Simulation {
       this.underlying.removePlayer(playerId);
       this.synchronizeBotPopulation();
     } else if (this.activeBots.has(playerId)) {
+      const bot = this.activeBots.get(playerId)!;
+      bot.brain.reset();
       this.activeBots.delete(playerId);
       this.underlying.removePlayer(playerId);
     }
@@ -121,7 +123,10 @@ export class BotSimulation implements Simulation {
       for (const bot of this.activeBots.values()) {
         const snapshot = this.underlying.snapshotFor(bot.id);
         const botTeam =
-          snapshot?.entities.find((e: EntityState) => e.id === snapshot.self.entityId)?.team ?? 0;
+          (snapshot?.entities.find((e: EntityState) => e.id === snapshot.self.entityId)?.team as
+            TeamId | undefined) ??
+          bot.brain.team ??
+          0;
         const obstacles = this.getObstacles(botTeam);
         const navGrid = this.getNavGrid(botTeam, obstacles);
 
@@ -163,12 +168,14 @@ export class BotSimulation implements Simulation {
       const botToRemove = activeList[activeList.length - 1]!;
       this.activeBots.delete(botToRemove.id);
       this.underlying.removePlayer(botToRemove.id);
+      botToRemove.brain.reset();
     }
 
     // Expand if humans left or on initial spawn
     while (this.activeBots.size < targetBotCount) {
       const nextBot = this.allBots[this.activeBots.size];
       if (!nextBot) break;
+      nextBot.brain.reset();
       this.activeBots.set(nextBot.id, nextBot);
       this.underlying.addPlayer(nextBot.id, { name: nextBot.name });
     }
@@ -177,6 +184,7 @@ export class BotSimulation implements Simulation {
   private removeAllBots(): void {
     for (const bot of this.activeBots.values()) {
       this.underlying.removePlayer(bot.id);
+      bot.brain.reset();
     }
     this.activeBots.clear();
   }

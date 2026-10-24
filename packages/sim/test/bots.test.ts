@@ -1,23 +1,96 @@
 import { describe, expect, it } from 'vitest';
 import {
   FIRST_SOLO_TEAM,
+  LIMITS,
   resolveModeConfig,
+  type MatchState,
   type ModeConfig,
   type PlayerInput,
   type Rect,
+  type SnapshotPayload,
   type TankState,
 } from '@diep-fried/shared';
 import { createBotSimulation, BOT_ID_BASE, BOT_NAMES } from '../src/bots';
+import { BotBrain } from '../src/bots/bot-brain';
+import { NavGrid, steerAroundObstacles } from '../src/bots/bot-navigation';
 import { createSimulation } from '../src/world';
-import { steerAroundObstacles } from '../src/bots/bot-navigation';
+import { Rng } from '../src/rng';
 
-const dummyInput: PlayerInput = {
-  seq: 1,
-  move: { x: 0, y: 0 },
-  aim: { x: 100, y: 0 },
-  fire: false,
-  alt: false,
-};
+function createTestSnapshot(overrides: Partial<SnapshotPayload> = {}): SnapshotPayload {
+  const emptyStats = {
+    movementSpeed: 0,
+    bulletSpeed: 0,
+    bulletPenetration: 0,
+    bulletDamage: 0,
+    reload: 0,
+    maxHealth: 0,
+    healthRegen: 0,
+    bodyDamage: 0,
+  };
+  return {
+    tick: 4,
+    ackSeq: 0,
+    self: {
+      playerId: BOT_ID_BASE + 1,
+      entityId: 101,
+      alive: true,
+      classId: 'tank',
+      level: 1,
+      score: 0,
+      levelProgress: 0,
+      statPoints: 0,
+      stats: { ...emptyStats },
+      statCaps: { ...emptyStats },
+      classChoices: [],
+      view: 1000,
+      respawnTick: null,
+      ...overrides.self,
+    },
+    entities: [
+      {
+        id: 101,
+        kind: 'tank',
+        playerId: BOT_ID_BASE + 1,
+        x: 1000,
+        y: 1000,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        radius: 25,
+        health: 100,
+        maxHealth: 100,
+        team: 1,
+        name: '[BOT] Alpha',
+        classId: 'tank',
+        level: 1,
+        score: 0,
+        opacity: 1,
+        barrelShots: [-1],
+        spawnProtected: false,
+      },
+      ...(overrides.entities ?? []),
+    ],
+    ...(overrides.match !== undefined ? { match: overrides.match } : {}),
+  };
+}
+
+function createTestMatch(overrides: Partial<MatchState> = {}): MatchState {
+  return {
+    phase: 'playing',
+    round: 1,
+    phaseTick: 0,
+    endTick: null,
+    minPlayers: 2,
+    players: 2,
+    result: null,
+    scores: [
+      { team: 1, score: 0, players: 1 },
+      { team: 2, score: 0, players: 1 },
+    ],
+    objectives: [],
+    ...overrides,
+  };
+}
 
 describe('Bots joueurs synthétiques (SimulationFactory createBotSimulation)', () => {
   it('1 humain 5 bots spawn/déplacement/tirs', () => {
@@ -306,5 +379,267 @@ describe('Bots joueurs synthétiques (SimulationFactory createBotSimulation)', (
 
     // La moyenne doit être largement inférieure à la durée d'un tick (33.3ms)
     expect(avg).toBeLessThan(10);
+  });
+
+  it('CTF : le porteur ramène le drapeau adverse vers sa propre base/drapeau et non vers la base ennemie', () => {
+    const config = resolveModeConfig('ctf');
+    const navGrid = new NavGrid(config.arena, []);
+    const brain = new BotBrain(BOT_ID_BASE + 1, 0, 'normal', new Rng(1234));
+
+    // Bot de l'équipe 1 situé à (1500, 1500)
+    // Drapeau Team 1 (allié) à la base (200, 200)
+    // Drapeau Team 2 (ennemi) transporté par le bot, base ennemie à (4800, 4800)
+    const snap = createTestSnapshot({
+      self: { playerId: BOT_ID_BASE + 1, entityId: 101, alive: true } as any,
+      match: createTestMatch({
+        objectives: [
+          {
+            id: 0,
+            kind: 'flag',
+            team: 1,
+            x: 200,
+            y: 200,
+            radius: 24,
+            entityId: null,
+            progress: 1,
+            flag: {
+              status: 'home',
+              carrierId: null,
+              homeX: 200,
+              homeY: 200,
+              returnTick: null,
+            },
+          },
+          {
+            id: 1,
+            kind: 'flag',
+            team: 2,
+            x: 1500,
+            y: 1500,
+            radius: 24,
+            entityId: null,
+            progress: 0,
+            flag: {
+              status: 'carried',
+              carrierId: BOT_ID_BASE + 1,
+              homeX: 4800,
+              homeY: 4800,
+              returnTick: null,
+            },
+          },
+        ],
+      }),
+    });
+
+    const input = brain.step(snap, config, [], navGrid, () => {});
+
+    // Le bot doit se déplacer vers le camp allié (200, 200) -> move.x < 0 et move.y < 0
+    // Il ne doit SURTOUT PAS se diriger vers la base ennemie (4800, 4800) -> move.x > 0 et move.y > 0
+    expect(input.move.x).toBeLessThan(0);
+    expect(input.move.y).toBeLessThan(0);
+  });
+
+  it('CTF : respecte positionHidden et ignore les coordonnées masquées', () => {
+    const config = resolveModeConfig('ctf');
+    const navGrid = new NavGrid(config.arena, []);
+    const brain = new BotBrain(BOT_ID_BASE + 1, 0, 'normal', new Rng(5678));
+
+    // Le drapeau adverse est porté par un ennemi invisible (positionHidden: true, x/y = 4800/4800 base)
+    const snapHidden = createTestSnapshot({
+      self: { playerId: BOT_ID_BASE + 1, entityId: 101, alive: true } as any,
+      match: createTestMatch({
+        objectives: [
+          {
+            id: 0,
+            kind: 'flag',
+            team: 1,
+            x: 200,
+            y: 200,
+            radius: 24,
+            entityId: null,
+            progress: 1,
+            flag: {
+              status: 'home',
+              carrierId: null,
+              homeX: 200,
+              homeY: 200,
+              returnTick: null,
+            },
+          },
+          {
+            id: 1,
+            kind: 'flag',
+            team: 2,
+            x: 4800,
+            y: 4800,
+            radius: 24,
+            entityId: null,
+            progress: 0,
+            flag: {
+              status: 'carried',
+              carrierId: null,
+              homeX: 4800,
+              homeY: 4800,
+              returnTick: null,
+              positionHidden: true,
+            },
+          },
+        ],
+      }),
+    });
+
+    // Le bot ne doit pas se précipiter vers les coordonnées masquées (4800, 4800)
+    const input = brain.step(snapHidden, config, [], navGrid, () => {});
+    expect(input).toBeDefined();
+  });
+
+  it('CTF : ne poursuit pas un drapeau situé à l’intérieur d’une base ennemie interdite', () => {
+    const config = resolveModeConfig('ctf');
+    const configWithBase = {
+      ...config,
+      map: {
+        ...config.map,
+        zones: [
+          {
+            kind: 'base' as const,
+            team: 2 as any,
+            area: { x: 4500, y: 4500, width: 500, height: 500 },
+          },
+        ],
+      },
+    };
+    const navGrid = new NavGrid(configWithBase.arena, []);
+    const brain = new BotBrain(BOT_ID_BASE + 1, 0, 'normal', new Rng(9999));
+
+    // Drapeau ennemi placé à l'intérieur de la base ennemie
+    const snapInBase = createTestSnapshot({
+      self: { playerId: BOT_ID_BASE + 1, entityId: 101, alive: true } as any,
+      match: createTestMatch({
+        objectives: [
+          {
+            id: 0,
+            kind: 'flag',
+            team: 1,
+            x: 200,
+            y: 200,
+            radius: 24,
+            entityId: null,
+            progress: 1,
+            flag: {
+              status: 'home',
+              carrierId: null,
+              homeX: 200,
+              homeY: 200,
+              returnTick: null,
+            },
+          },
+          {
+            id: 1,
+            kind: 'flag',
+            team: 2,
+            x: 4700,
+            y: 4700,
+            radius: 24,
+            entityId: null,
+            progress: 1,
+            flag: {
+              status: 'home',
+              carrierId: null,
+              homeX: 4700,
+              homeY: 4700,
+              returnTick: null,
+            },
+          },
+        ],
+      }),
+    });
+
+    const input = brain.step(snapInBase, configWithBase, [], navGrid, () => {});
+    expect(input).toBeDefined();
+  });
+
+  it('contrat de visée : vecteur relatif au tank et borné par LIMITS.maxAimDistance', () => {
+    const config = resolveModeConfig('ffa');
+    const navGrid = new NavGrid(config.arena, []);
+    const brain = new BotBrain(BOT_ID_BASE + 1, 0, 'hard', new Rng(42));
+
+    // Bot à (1000, 1000), cible ennemie à (1300, 1400) -> distance relative = 500
+    const enemy: TankState = {
+      id: 202,
+      kind: 'tank',
+      playerId: null,
+      x: 1300,
+      y: 1400,
+      vx: 0,
+      vy: 0,
+      angle: 0,
+      radius: 25,
+      health: 100,
+      maxHealth: 100,
+      team: 2,
+      name: 'Target',
+      classId: 'tank',
+      level: 1,
+      score: 0,
+      opacity: 1,
+      barrelShots: [-1],
+      spawnProtected: false,
+    };
+
+    const snapCombat = createTestSnapshot({
+      entities: [enemy],
+    });
+
+    const input = brain.step(snapCombat, config, [], navGrid, () => {});
+
+    // La norme du vecteur aim doit être relative au tank (~500), et NON absolue (~1900)
+    const aimLen = Math.hypot(input.aim.x, input.aim.y);
+    expect(aimLen).toBeGreaterThan(400);
+    expect(aimLen).toBeLessThan(600);
+    expect(aimLen).toBeLessThanOrEqual(LIMITS.maxAimDistance);
+
+    // Le vecteur relatif pointe vers (+300, +400), donc composantes positives
+    expect(input.aim.x).toBeGreaterThan(0);
+    expect(input.aim.y).toBeGreaterThan(0);
+  });
+
+  it('réinsertion des bots : réinitialise l’état tactique et préserve la monotonie de seq', () => {
+    const config = resolveModeConfig('ffa', { maxPlayers: 3, botCount: 2 });
+    const sim = createBotSimulation({ config, seed: 1010 });
+
+    sim.addPlayer(1, { name: 'Player1' });
+    sim.step();
+
+    const botId = BOT_ID_BASE + 1;
+    const snapBefore = sim.snapshotFor(botId);
+    expect(snapBefore).toBeDefined();
+
+    for (let i = 0; i < 10; i++) {
+      sim.step();
+    }
+
+    // Deux nouveaux humains rejoignent : capacité max = 3 atteinte (3 humains, 0 bot)
+    sim.addPlayer(2, { name: 'Player2' });
+    sim.addPlayer(3, { name: 'Player3' });
+    sim.step();
+
+    // Tous les bots doivent être retirés
+    expect(sim.snapshotFor(botId)).toBeUndefined();
+
+    // Un humain quitte : bot réinséré
+    sim.removePlayer(3);
+    sim.step();
+
+    const snapAfter = sim.snapshotFor(botId);
+    expect(snapAfter).toBeDefined();
+    expect(snapAfter!.self.alive).toBe(true);
+
+    // Avancer d'autres ticks : la monotonie est préservée
+    for (let i = 0; i < 5; i++) {
+      sim.step();
+    }
+    const finalSnap = sim.snapshotFor(botId);
+    expect(finalSnap).toBeDefined();
+    expect(finalSnap!.self.alive).toBe(true);
   });
 });

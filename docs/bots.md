@@ -48,7 +48,7 @@ export interface ModeConfig {
 - **Valeurs par défaut** : 5 bots, difficulté `'normal'`.
 - **Plafond dur** : le nombre de bots est plafonné à `Math.min(12, maxPlayers - 1)`.
 - **Désactivation** : l'option `botCount: 0` positionne `config.bots = { count: 0, difficulty }`, ce qui désactive totalement l'apparition des bots.
-- **Validation réseau** : le codec `decodeClientMessage` valide strictement les types (entier 0..12 pour `botCount`, énumération valide pour `botDifficulty`) et rejette tout message malformé avec une erreur non fatale. Le résolveur applique également un bornage défensif.
+- **Validation réseau et bornage** : le codec `decodeClientMessage` valide strictement les types (entier 0..12 pour `botCount`, énumération valide pour `botDifficulty`) et rejette tout message malformé avec une erreur non fatale. Le résolveur applique un bornage défensif contre `NaN`, les valeurs non finies ou négatives pour `maxPlayers` et `botCount`.
 
 ## 3. Identité et équité des bots
 
@@ -62,7 +62,8 @@ Les bots sont des joueurs légitimes dans l'univers de simulation :
 ## 4. Priorité humaine et cycle de vie
 
 - **Comptage `maxPlayers`** : la limite de joueurs de l'arène inclut humains + bots.
-- **Slots prioritaires aux humains** : à mesure que des joueurs humains rejoignent le salon, le wrapper réduit la population active de bots pour libérer les places jusqu'à `maxPlayers`. Si des humains quittent, la population de bots est restaurée.
+- **Slots prioritaires aux humains** : à mesure que des joueurs humains rejoignent le salon, le wrapper réduit la population active de bots pour libérer les places jusqu'à `maxPlayers`. L'éviction des bots intervient avant l'insertion du joueur humain dans la simulation sous-jacente, garantissant que la capacité maximale n'est jamais dépassée. Si des humains quittent, la population de bots est restaurée.
+- **Réinsertion propre des bots** : lorsqu'un bot est retiré puis réinséré au départ d'un humain, son état tactique et spatial (points de passage, destination, détection de blocage, cibles) est réinitialisé (`brain.reset()`) pour éviter toute manœuvre obsolète, tout en préservant la stricte monotonie de `seq`.
 - **Nettoyage automatique (cleanup)** : dès que le dernier joueur humain quitte le salon, tous les bots sont retirés de la simulation. Le salon ne reste pas artificiellement actif et s'éteint normalement selon son délai d'inactivité (`emptyRoomTtlMs`).
 - **Distinction des métriques** : `Room.playerCount` et l'endpoint `/healthz` comptent uniquement les joueurs humains connectés (sièges actifs). Les bots résident exclusivement au sein de la simulation.
 - **Reconnexion sans duplication** : la reconnexion d'un joueur existant (`Room.resume`) ne déclenche aucun nouvel appel d'ajout de joueur et ne duplique pas les bots.
@@ -79,18 +80,19 @@ L'IA des bots est entièrement autoritaire et déterministe, alimentée par une 
   - Évitement local : calcul de faisceaux de balayage par segments (`sweepCircleVsWalls`) avec rayon augmenté d'une marge de sécurité.
   - Grille A* globale : pour les arènes avec labyrinthes (Maze), un graphe de navigation sur grille à budget d'expansion borné calcule les points de passage (waypoints).
   - Anti-blocage : détection d'immobilité prolongée et manœuvre d'échappement aléatoire garantissant que les bots ne restent pas bloqués indéfiniment contre les murs.
+- **Contrat de visée (`PlayerInput.aim`)** : l'orientation et le guidage s'expriment strictement par un vecteur relatif au centre du tank en unités monde (et non des coordonnées absolues), borné défensivement par `LIMITS.maxAimDistance`.
 - **Profils de difficulté** :
   - `easy` : réaction lente, lissage de visée important, dispersion aléatoire accrue (jusqu'à ±0,22 rad), seuil de fuite bas (PV < 25%).
   - `normal` : réaction équilibrée, dispersion modérée (jusqu'à ±0,09 rad), seuil de fuite standard (PV < 35%).
   - `hard` : visée vive avec anticipation balistique (lead) précise, dispersion minimale (±0,02 rad), seuil de fuite réactif (PV < 40%).
 - **Comportements et objectifs** :
   - _Farming_ : destruction des formes neutres visibles pour monter en niveau.
-  - _Combat_ : engagement des adversaires visibles à distance optimale, esquive par pas latéraux (strafing).
-  - _Fuite_ : repli tactique en cas de santé critique ou face aux essaims de drones / boss.
-  - _CTF_ : transport du drapeau ennemi vers la base alliée ; récupération des drapeaux alliés tombés ; assaut du drapeau adverse.
+  - _Combat_ : engagement des adversaires visibles à distance optimale, esquive par pas latéraux (strafing), sans s'aventurer dans les bases ennemies.
+  - _Fuite_ : repli tactique en cas de santé critique ou face aux essaims de drones / boss (confiné dans la `safeZone` en mode Survival).
+  - _CTF_ : transport du drapeau ennemi vers la base et le drapeau alliés afin de marquer le point ; récupération des drapeaux alliés tombés ; assaut des drapeaux adverses disponibles (non portés, hors base ennemie) ; respect strict de `positionHidden` (les coordonnées masquées d'un drapeau porté par un adversaire invisible ne sont pas poursuivies).
   - _Domination_ : attaque et capture des Dominators neutres ou ennemis.
   - _Breakout_ : occupation et défense des territoires.
-  - _Survival_ : maintien obligatoire à l'intérieur de la zone sûre (`safeZone`) ; en cas d'élimination, le bot passe spectateur et attend le round suivant.
+  - _Survival_ : maintien obligatoire à l'intérieur de la zone sûre (`safeZone`) ; en cas d'élimination, le bot passe spectateur et attend le round suivant pour réapparaître avec un état tactique neuf.
   - _Tag_ : traque des joueurs des camps adverses.
 
 ## 6. Limites documentées de l'IA
