@@ -1,6 +1,7 @@
 import type { ModeConfig, TankState } from '@diep-fried/shared';
 import { PALETTE, TEAM_COLORS } from './palette';
 import type { RenderFrame } from '../state/snapshot-buffer';
+import { drawObjectives } from './objectives';
 
 /**
  * Dessin de la minicarte sur un contexte Canvas 2D.
@@ -84,6 +85,18 @@ export function drawMinimap(
       ctx.fillRect(wx, wy, ww, wh);
     }
   }
+
+  drawObjectives(
+    ctx,
+    {
+      point: (at) => ({ x: toMapX(at.x), y: toMapY(at.y) }),
+      scale: mapW / arenaW,
+      bounds: { x: mapX, y: mapY, width: mapW, height: mapH },
+      minimap: true,
+    },
+    frame.match,
+    config,
+  );
 
   // Joueur local : triangle noir orienté selon sa visée
   const own = frame.entities.find(

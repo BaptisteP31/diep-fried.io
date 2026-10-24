@@ -6,6 +6,7 @@ export interface RenderFrame {
   tick: number;
   self: SelfState;
   entities: EntityState[];
+  match?: SnapshotPayload['match'];
 }
 
 /**
@@ -64,12 +65,22 @@ export class SnapshotBuffer {
       const before = previous.get(entity.id);
       return before && before.kind === entity.kind ? interpolate(before, entity, alpha) : entity;
     });
-    return { tick: renderTick, self: to.self, entities };
+    return {
+      tick: renderTick,
+      self: to.self,
+      entities,
+      ...(newest.match ? { match: newest.match } : {}),
+    };
   }
 }
 
 function frameOf(snapshot: SnapshotPayload, tick: number): RenderFrame {
-  return { tick, self: snapshot.self, entities: snapshot.entities };
+  return {
+    tick,
+    self: snapshot.self,
+    entities: snapshot.entities,
+    ...(snapshot.match ? { match: snapshot.match } : {}),
+  };
 }
 
 function interpolate<T extends EntityState>(from: T, to: T, alpha: number): T {

@@ -46,6 +46,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('mort pendant une déconnexion', () => {
+  it('affiche explicitement le spectateur et refuse clic/Entrée après tout délai', () => {
+    const respawn = vi.fn();
+    const screen = new DeathScreen({ onRespawn: respawn });
+    screen.syncSelf(self({ spectator: true, respawnTick: null }), 90, 30);
+    screen.setTick(100000);
+    expect(el('death-title').textContent).toBe('Spectateur');
+    expect(el('death-respawn').textContent).toBe('Réapparition au prochain round');
+    expect(el('death-respawn').disabled).toBe(true);
+    el('death-respawn').dispatchEvent(new Event('click'));
+    key('keydown', 'Enter');
+    key('keydown', 'Space');
+    expect(respawn).not.toHaveBeenCalled();
+    screen.syncSelf(self({ alive: true, spectator: false }), 100001, 30);
+    expect(screen.isVisible).toBe(false);
+  });
   it('affiche le résumé autoritaire self et permet respawn sans événement death', () => {
     const respawn = vi.fn();
     const screen = new DeathScreen({ onRespawn: respawn });
@@ -80,6 +95,27 @@ describe('mort pendant une déconnexion', () => {
 });
 
 describe('neutralisation des entrées', () => {
+  it('conserve la séquence mais ne rejoue pas le mouvement/tir du round précédent', () => {
+    const onPossess = vi.fn();
+    const input = new InputController(new Element() as unknown as HTMLElement, { onPossess });
+    key('keydown', 'KeyW');
+    key('keydown', 'KeyE');
+    key('keydown', 'KeyH');
+    expect(onPossess).toHaveBeenCalledOnce();
+    input.acknowledgeSequence(50);
+    input.reset(false);
+    const repeat = new Event('keydown', { cancelable: true });
+    Object.assign(repeat, { code: 'KeyW', repeat: true });
+    win.dispatchEvent(repeat);
+    expect(input.sample({ x: 0, y: 0 }, 1, 0)).toMatchObject({
+      seq: 51,
+      move: { x: 0, y: 0 },
+      fire: false,
+    });
+    key('keyup', 'KeyW');
+    key('keydown', 'KeyW');
+    expect(input.sample({ x: 0, y: 0 }, 1, 0).move.y).toBe(-1);
+  });
   it('désactive mouvement, souris, bascules et statistiques pendant une modale puis repart au repos', () => {
     const onStat = vi.fn();
     const input = new InputController(new Element() as unknown as HTMLElement, { onStat });
@@ -140,6 +176,19 @@ describe('stockage indisponible', () => {
 });
 
 describe('modes et options du menu', () => {
+  it('décrit les six modes à objectifs et refuse une capacité qui ne permet pas de démarrer', () => {
+    const create = vi.fn();
+    new Menu({ create, join: vi.fn(), onOpenControls: vi.fn() });
+    for (const mode of ['domination', 'tag', 'ctf', 'breakout', 'survival', 'mothership']) {
+      expect(modeDetails(mode).rules).toContain('2 joueurs connectés minimum');
+      expect(modeDetails(mode).rules).not.toContain('Mode proposé par le serveur');
+    }
+    el('menu-mode').value = 'ctf';
+    el('menu-max-players').value = '1';
+    el('menu-create').dispatchEvent(new Event('click'));
+    expect(create).not.toHaveBeenCalled();
+    expect(el('menu-status').textContent).toContain('2 joueurs minimum');
+  });
   it('propose tous les MODE_IDS, les règles et un libellé de secours pour un futur mode', () => {
     new Menu({ create: vi.fn(), join: vi.fn(), onOpenControls: vi.fn() });
     expect(el('menu-mode').children.map((option) => option.value)).toEqual([...MODE_IDS]);

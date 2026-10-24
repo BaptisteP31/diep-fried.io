@@ -13,6 +13,7 @@ export interface InputControllerOptions {
   onUpgradeTree?: (open: boolean) => void;
   bindings?: KeyBindings;
   onSandbox?: (action: SandboxAction) => void;
+  onPossess?: () => void;
   isBlocked?: () => boolean;
 }
 
@@ -34,6 +35,7 @@ export class InputController {
     ((action: 'autoFire' | 'autoSpin', enabled: boolean) => void) | undefined;
   private readonly onUpgradeTree: ((open: boolean) => void) | undefined;
   private readonly onSandbox: ((action: SandboxAction) => void) | undefined;
+  private readonly onPossess: (() => void) | undefined;
   private readonly isBlocked: () => boolean;
 
   constructor(
@@ -52,6 +54,7 @@ export class InputController {
       this.onToggle = onStatOrOptions.onToggle;
       this.onUpgradeTree = onStatOrOptions.onUpgradeTree;
       this.onSandbox = onStatOrOptions.onSandbox;
+      this.onPossess = onStatOrOptions.onPossess;
       this.isBlocked = onStatOrOptions.isBlocked ?? (() => false);
       this.bindings = onStatOrOptions.bindings ?? bindingsArg ?? loadBindings();
     }
@@ -185,8 +188,9 @@ export class InputController {
     }
 
     if (action.kind === 'held') {
-      if (down) this.held.add(action.action);
-      else this.held.delete(action.action);
+      if (down) {
+        if (!event.repeat) this.held.add(action.action);
+      } else this.held.delete(action.action);
       return;
     }
     if (action.kind === 'sandbox') {
@@ -200,6 +204,8 @@ export class InputController {
       this.toggleAutoFire();
     } else if (action.action === 'autoSpin') {
       this.toggleAutoSpin();
+    } else if (action.action === 'possess') {
+      this.onPossess?.();
     }
   }
 

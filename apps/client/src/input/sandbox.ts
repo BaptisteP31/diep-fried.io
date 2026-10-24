@@ -6,6 +6,7 @@ export const SANDBOX_ACTIONS: ReadonlyArray<{ action: SandboxAction; label: stri
   { action: 'cycleClass', label: 'Classe suivante' },
   { action: 'selfDestruct', label: 'Autodestruction' },
   { action: 'toggleGod', label: 'Basculer l’invulnérabilité' },
+  { action: 'summonBoss', label: 'Invoquer un boss' },
 ];
 
 /** Garde commune aux boutons et raccourcis. Le serveur décide de l’effet réel. */

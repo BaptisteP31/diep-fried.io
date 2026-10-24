@@ -17,6 +17,8 @@ import { Menu } from './ui/menu';
 import { UpgradeTreeModal } from './ui/upgrade-tree-modal';
 import { SandboxPanel } from './ui/sandbox-panel';
 import { setupDisplaySettings } from './ui/display-settings';
+import { MatchHud } from './ui/match-hud';
+import { needsVisualReset } from './ui/match-model';
 
 /** Intervalle maximal sans envoi d'intention, même si rien ne change. */
 const INPUT_KEEPALIVE_MS = 250;
@@ -45,6 +47,7 @@ const controlsModal = new ControlsModal({
   onBindingsChanged: (newBindings) => {
     input.setBindings(newBindings);
     sandboxPanel.setBindings(newBindings);
+    matchHud.setBindings(newBindings);
   },
   onVisibilityChanged: () => syncInputAvailability(),
 });
@@ -59,6 +62,8 @@ const upgradeTreeModal = new UpgradeTreeModal({
 // Écran de mort avec décompte de réapparition
 const deathScreen = new DeathScreen({
   onRespawn: () => {
+    const latest = buffer?.latest();
+    if (latest?.self.spectator || latest?.match?.phase === 'finished') return;
     if (!controlsModal.isVisible) sendCommand({ type: 'respawn' });
   },
 });
@@ -89,6 +94,8 @@ const sandboxCommands = new SandboxCommands(
 );
 const sandboxPanel = new SandboxPanel(sandboxCommands);
 sandboxPanel.setBindings(loadBindings());
+const matchHud = new MatchHud(possessObjective);
+matchHud.setBindings(loadBindings());
 setupDisplaySettings((settings) => renderer.setDisplaySettings(settings));
 document.getElementById('hud-leave')!.addEventListener('click', leaveRoom);
 
@@ -127,6 +134,7 @@ const input = new InputController(canvas, {
   },
   bindings: loadBindings(),
   onSandbox: (action) => sandboxCommands.run(action),
+  onPossess: possessObjective,
   isBlocked: () => modalsOpen(),
 });
 
@@ -158,6 +166,13 @@ function sendCommand(command: PlayerCommand): void {
   if (config && !controlsModal.isVisible) connection.send({ t: 'command', command });
 }
 
+function possessObjective(): void {
+  const latest = buffer?.latest();
+  if (!latest?.self.alive || latest.match?.phase === 'finished' || modalsOpen()) return;
+  if (config?.mode === 'domination' || config?.mode === 'mothership')
+    sendCommand({ type: 'possess' });
+}
+
 function modalsOpen(): boolean {
   return controlsModal.isVisible || upgradeTreeModal.isOpen();
 }
@@ -174,7 +189,10 @@ function leaveRoom(): void {
 }
 
 function syncInputAvailability(): void {
-  input.setEnabled(!!buffer?.latest()?.self.alive && !controlsModal.isVisible);
+  const latest = buffer?.latest();
+  input.setEnabled(
+    !!latest?.self.alive && latest.match?.phase !== 'finished' && !controlsModal.isVisible,
+  );
 }
 
 function resetRoom(): void {
@@ -192,6 +210,7 @@ function resetRoom(): void {
   sandboxPanel.sync(null);
   renderer.reset();
   hud.reset();
+  matchHud.reset();
   deathScreen.hide();
   upgradeTreeModal.hide();
   if (controlsModal.isVisible) controlsModal.hide();
@@ -242,6 +261,19 @@ function handleMessage(message: ServerMessage, rejectedIntent?: RoomIntent): voi
     case 'snapshot':
       if (!config || !buffer) return;
       if (message.tick <= (buffer.latest()?.tick ?? -1)) return;
+      const previous = buffer.latest();
+      if (needsVisualReset(previous, message)) {
+        buffer.clear();
+        renderer.reset();
+        // Garder la séquence de connexion, purger touches/tir et forcer une intention neutre.
+        input.reset(false);
+        lastInput = '';
+        lastInputAt = 0;
+        // Une mort reçue juste avant self conserve son résumé et son éliminateur.
+        if (message.self.alive || previous?.match?.round !== message.match?.round)
+          deathScreen.hide();
+        upgradeTreeModal.hide();
+      }
       buffer.push(message, performance.now());
       input.acknowledgeSequence(message.ackSeq);
       syncInputAvailability();
@@ -250,12 +282,17 @@ function handleMessage(message: ServerMessage, rejectedIntent?: RoomIntent): voi
       hud.show();
       hud.updateSelf(message.self, currentName);
       hud.updateLeaderboard(message.leaderboard, message.self.playerId);
+      matchHud.update(message, config);
 
-      deathScreen.syncSelf(message.self, message.tick, config.tickRate);
+      if (message.match?.phase === 'finished') deathScreen.hide();
+      else deathScreen.syncSelf(message.self, message.tick, config.tickRate);
       return;
 
     case 'death':
       input.setEnabled(false);
+      matchHud.notify(
+        message.killerName ? `Éliminé par ${message.killerName}` : 'Vous avez été éliminé',
+      );
       deathScreen.setTick(message.tick);
       deathScreen.show(message, config?.tickRate ?? 30);
       return;
@@ -316,6 +353,7 @@ function frame(now: number): void {
   const current = buffer?.sample(now) ?? null;
   renderer.draw(current, config, now);
   sandboxPanel.sync(config);
+  matchHud.renderNotices(now);
 
   // Rendu de la minicarte
   if (minimapCtx) {

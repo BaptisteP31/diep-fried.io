@@ -3,6 +3,7 @@ import {
   MAX_PLAYERS_LIMIT,
   isModeId,
   normalizeRoomCode,
+  resolveModeConfig,
   type ModeId,
   type RoomOptions,
 } from '@diep-fried/shared';
@@ -65,6 +66,12 @@ export class Menu {
           element<HTMLSelectElement>('menu-arena-size').value,
           element<HTMLSelectElement>('menu-shape-density').value,
         );
+        const minimum = resolveModeConfig(this.mode.value).match?.minPlayers;
+        if (minimum && options.maxPlayers !== undefined && options.maxPlayers < minimum) {
+          throw new Error(
+            `Ce mode requiert ${minimum} joueurs minimum. Augmentez la capacité du salon pour pouvoir démarrer.`,
+          );
+        }
         actions.create(getName(), this.mode.value, options);
       } catch (error) {
         this.setStatus((error as Error).message);

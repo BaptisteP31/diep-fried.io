@@ -5,8 +5,10 @@ import {
   emptyStatLevels,
   type ClientMessage,
   type ServerMessage,
+  type ModeId,
 } from '@diep-fried/shared';
 import { installDom, type Element } from './helpers/dom';
+import { match, snapshot, tank } from './helpers/match';
 
 let el: (id: string) => Element;
 
@@ -147,7 +149,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function enter(mode: 'ffa' | 'sandbox' = 'ffa') {
+function enter(mode: ModeId = 'ffa') {
   ui.menu.actions.create('Alice', mode, { maxPlayers: 8, arenaSize: 'small' });
   const socket = Socket.all[0]!;
   socket.open();
@@ -157,6 +159,60 @@ function enter(mode: 'ffa' | 'sandbox' = 'ffa') {
 }
 
 describe('intégration du cycle client', () => {
+  it('conserve le résumé death quand le snapshot confirme la mort, puis le purge au round suivant', () => {
+    const socket = enter('survival');
+    socket.receive({ t: 'snapshot', ...snapshot() });
+    const death = {
+      ...snapshot().self,
+      t: 'death' as const,
+      tick: 61,
+      killerName: 'Bob',
+      respawnTick: 90,
+    };
+    socket.receive(death);
+    ui.death.hide.mockClear();
+    const dead = { ...snapshot().self, alive: false, entityId: null, spectator: true };
+    socket.receive({ t: 'snapshot', ...snapshot({ tick: 62, self: dead }) });
+    expect(ui.death.hide).not.toHaveBeenCalled();
+    expect(ui.death.show).toHaveBeenLastCalledWith(death, 30);
+    expect(ui.death.syncSelf).toHaveBeenLastCalledWith(dead, 62, 30);
+    socket.receive({
+      t: 'snapshot',
+      ...snapshot({ tick: 64, self: dead, match: match({ round: 2 }) }),
+    });
+    expect(ui.death.hide).toHaveBeenCalledOnce();
+  });
+  it('purge interpolation et entrées au round suivant en conservant salon/config/jeton et séquence', () => {
+    const socket = enter('domination');
+    socket.receive({ t: 'snapshot', ...snapshot({ tick: 60, entities: [tank({ x: 100 })] }) });
+    ui.input.reset.mockClear();
+    ui.renderer.reset.mockClear();
+    ui.menu.saveSession.mockClear();
+    socket.receive({
+      t: 'snapshot',
+      ...snapshot({ tick: 62, match: match({ round: 2 }), entities: [tank({ x: 900 })] }),
+    });
+    expect(ui.input.reset).toHaveBeenCalledWith(false);
+    expect(ui.input.acknowledgeSequence).toHaveBeenLastCalledWith(50);
+    expect(ui.renderer.reset).toHaveBeenCalledOnce();
+    expect(ui.menu.saveSession).not.toHaveBeenCalled();
+    const callback = vi.mocked(requestAnimationFrame).mock.calls[0]![0];
+    callback(performance.now());
+    expect(ui.renderer.draw.mock.calls.at(-1)?.[0]?.entities[0]?.x).toBe(900);
+    expect(ui.renderer.draw.mock.calls.at(-1)?.[1]?.mode).toBe('domination');
+    expect(el('minimap-container').hidden).toBe(false);
+    ui.input.options.onPossess();
+    expect(socket.sent.at(-1)).toEqual({ t: 'command', command: { type: 'possess' } });
+    socket.receive({
+      t: 'snapshot',
+      ...snapshot({ tick: 64, match: match({ phase: 'finished', round: 2 }) }),
+    });
+    expect(ui.input.setEnabled).toHaveBeenLastCalledWith(false);
+    expect(ui.death.hide).toHaveBeenCalled();
+    const sent = socket.sent.length;
+    ui.input.options.onPossess();
+    expect(socket.sent).toHaveLength(sent);
+  });
   it('envoie les options du créateur par le vrai contrat GameConnection', () => {
     const socket = enter();
     expect(socket.sent[1]).toEqual({

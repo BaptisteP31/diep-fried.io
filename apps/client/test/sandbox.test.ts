@@ -23,7 +23,13 @@ describe('commandes Sandbox', () => {
     let blocked = false;
     const send = vi.fn();
     const commands = new SandboxCommands(() => ({ config, alive, blocked }), send);
-    const actions: SandboxAction[] = ['levelUp', 'cycleClass', 'selfDestruct', 'toggleGod'];
+    const actions: SandboxAction[] = [
+      'levelUp',
+      'cycleClass',
+      'selfDestruct',
+      'toggleGod',
+      'summonBoss',
+    ];
     actions.forEach((action) => commands.run(action));
     config = resolveModeConfig('sandbox');
     config.sandbox.cheats = false;
@@ -68,7 +74,7 @@ describe('commandes Sandbox', () => {
       Object.assign(event, { code, repeat });
       dom.win.dispatchEvent(event);
     };
-    for (const code of ['KeyK', 'Backslash', 'KeyO', 'Semicolon']) {
+    for (const code of ['KeyK', 'Backslash', 'KeyO', 'Semicolon', 'KeyB']) {
       key(code);
       key(code, true);
     }
@@ -78,6 +84,7 @@ describe('commandes Sandbox', () => {
       'cycleClass',
       'selfDestruct',
       'toggleGod',
+      'summonBoss',
     ]);
     onSandbox.mockClear();
     key('KeyK', false, dom.el('menu-name'));
