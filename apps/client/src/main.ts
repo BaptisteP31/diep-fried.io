@@ -1,5 +1,5 @@
 import './style.css';
-import type { ModeConfig, PlayerCommand, ServerMessage } from '@diep-fried/shared';
+import type { PlayerCommand, ServerMessage } from '@diep-fried/shared';
 import { loadBindings } from './input/bindings';
 import { InputController } from './input/input-controller';
 import { isTypingTarget } from './input/focus';
@@ -19,6 +19,7 @@ import { SandboxPanel } from './ui/sandbox-panel';
 import { setupDisplaySettings } from './ui/display-settings';
 import { MatchHud } from './ui/match-hud';
 import { needsVisualReset } from './ui/match-model';
+import type { ClientModeConfig } from './ui/modes';
 
 /** Intervalle maximal sans envoi d'intention, même si rien ne change. */
 const INPUT_KEEPALIVE_MS = 250;
@@ -30,7 +31,7 @@ const minimapContainer = document.getElementById('minimap-container') as HTMLEle
 const minimapCtx = minimapCanvas.getContext('2d');
 
 const renderer = new Renderer(canvas);
-let config: ModeConfig | null = null;
+let config: ClientModeConfig | null = null;
 let buffer: SnapshotBuffer | null = null;
 let lastInput = '';
 let lastInputAt = 0;
@@ -229,7 +230,7 @@ function handleMessage(message: ServerMessage, rejectedIntent?: RoomIntent): voi
     case 'room.joined': {
       resetRoom();
       exitStatus = null;
-      config = message.config;
+      config = message.config as ClientModeConfig;
       currentRoomCode = message.code;
       const tickMs = 1000 / config.tickRate;
       buffer = new SnapshotBuffer(tickMs, tickMs * config.snapshotInterval * 2);
@@ -240,6 +241,7 @@ function handleMessage(message: ServerMessage, rejectedIntent?: RoomIntent): voi
       canvas.focus();
 
       hud.setRoomCode(message.code);
+      hud.setBots?.(config.bots);
       minimapContainer.hidden = false;
       deathScreen.hide();
       return;

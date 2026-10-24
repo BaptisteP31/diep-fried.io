@@ -5,10 +5,9 @@ import {
   normalizeRoomCode,
   resolveModeConfig,
   type ModeId,
-  type RoomOptions,
 } from '@diep-fried/shared';
 import { readStored, writeStored } from '../state/storage';
-import { modeDetails, parseRoomOptions } from './modes';
+import { modeDetails, parseRoomOptions, type ClientRoomOptions } from './modes';
 
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
@@ -17,7 +16,7 @@ function element<T extends HTMLElement>(id: string): T {
 }
 
 export interface MenuActions {
-  create(name: string, mode: ModeId, options: RoomOptions): void;
+  create(name: string, mode: ModeId, options: ClientRoomOptions): void;
   join(name: string, code: string, resumeToken?: string): void;
   onOpenControls(): void;
 }
@@ -28,6 +27,10 @@ export class Menu {
   private readonly name = element<HTMLInputElement>('menu-name');
   private readonly mode = element<HTMLSelectElement>('menu-mode');
   private readonly code = element<HTMLInputElement>('menu-code');
+  private readonly maxPlayers = element<HTMLInputElement>('menu-max-players');
+  private readonly botCount = element<HTMLInputElement>('menu-bot-count');
+  private readonly botDifficulty = element<HTMLSelectElement>('menu-bot-difficulty');
+  private readonly botsHelp = element<HTMLParagraphElement>('menu-bots-help');
   private readonly status = element<HTMLParagraphElement>('menu-status');
   private readonly resumeContainer = element<HTMLDivElement>('menu-resume-container');
   private readonly resumeBtn = element<HTMLButtonElement>('menu-resume-btn');
@@ -50,7 +53,34 @@ export class Menu {
     };
     this.mode.addEventListener('change', describeMode);
     describeMode();
-    element<HTMLInputElement>('menu-max-players').max = String(MAX_PLAYERS_LIMIT);
+    this.maxPlayers.max = String(MAX_PLAYERS_LIMIT);
+
+    const updateMaxBots = () => {
+      const maxVal = this.maxPlayers.value.trim();
+      let maxBots = 12;
+      if (maxVal !== '') {
+        const count = Number(maxVal);
+        if (Number.isInteger(count) && count >= 1) {
+          maxBots = Math.min(12, Math.max(0, count - 1));
+        }
+      }
+      this.botCount.max = String(maxBots);
+      if (this.botCount.value !== '') {
+        const curBots = Number(this.botCount.value);
+        if (Number.isInteger(curBots) && curBots > maxBots) {
+          this.botCount.value = String(maxBots);
+        }
+      }
+      if (maxVal !== '') {
+        this.botsHelp.textContent = `Capacité : ${maxVal} joueur${Number(maxVal) > 1 ? 's' : ''} max (1 humain + max. ${maxBots} bot${maxBots > 1 ? 's' : ''}). Amis entrants remplacent les bots si besoin.`;
+      } else {
+        this.botsHelp.textContent = `Capacité selon le mode (max. 12 bots). Les amis qui arrivent remplacent les bots si besoin.`;
+      }
+    };
+
+    this.maxPlayers.addEventListener('input', updateMaxBots);
+    this.maxPlayers.addEventListener('change', updateMaxBots);
+    updateMaxBots();
 
     const getName = () => {
       const val = this.name.value.trim();
@@ -62,9 +92,11 @@ export class Menu {
       if (this.busy || !isModeId(this.mode.value)) return;
       try {
         const options = parseRoomOptions(
-          element<HTMLInputElement>('menu-max-players').value,
+          this.maxPlayers.value,
           element<HTMLSelectElement>('menu-arena-size').value,
           element<HTMLSelectElement>('menu-shape-density').value,
+          this.botCount.value,
+          this.botDifficulty.value,
         );
         const minimum = resolveModeConfig(this.mode.value).match?.minPlayers;
         if (minimum && options.maxPlayers !== undefined && options.maxPlayers < minimum) {
@@ -74,8 +106,13 @@ export class Menu {
         }
         actions.create(getName(), this.mode.value, options);
       } catch (error) {
-        this.setStatus((error as Error).message);
-        element('menu-max-players').focus();
+        const message = (error as Error).message;
+        this.setStatus(message);
+        if (message.toLowerCase().includes('bot')) {
+          this.botCount.focus();
+        } else {
+          this.maxPlayers.focus();
+        }
       }
     });
 

@@ -6,11 +6,16 @@ import {
   type ClientMessage,
   type ServerMessage,
 } from '@diep-fried/shared';
+import type { ClientRoomOptions } from '../ui/modes';
 
 const CLIENT_ID = `diep-fried-web/${import.meta.env.MODE}`;
 const REQUEST_TIMEOUT_MS = 10_000;
 
-export type RoomIntent = Extract<ClientMessage, { t: 'room.create' | 'room.join' }>;
+export type RoomCreateIntent = Omit<Extract<ClientMessage, { t: 'room.create' }>, 'options'> & {
+  options: ClientRoomOptions;
+};
+
+export type RoomIntent = RoomCreateIntent | Extract<ClientMessage, { t: 'room.join' }>;
 export type ConnectionState =
   'disconnected' | 'connecting' | 'ready' | 'joining' | 'joined' | 'leaving';
 
@@ -154,10 +159,10 @@ export class GameConnection {
     this.write(this.pending);
   }
 
-  private write(message: ClientMessage): boolean {
+  private write(message: ClientMessage | RoomIntent): boolean {
     if (this.socket?.readyState !== 1) return false;
     try {
-      this.socket.send(encodeMessage(message));
+      this.socket.send(encodeMessage(message as ClientMessage));
       return true;
     } catch {
       this.disconnect('envoi impossible');
@@ -165,31 +170,38 @@ export class GameConnection {
     }
   }
 
-  private setState(state: ConnectionState): void {
-    this.phase = state;
-    this.handlers.onStateChange?.(state, this.pending !== null);
-  }
-
   private armTimeout(): void {
     this.clearTimeout();
-    this.timer = setTimeout(
-      () => this.disconnect('délai de connexion dépassé'),
-      REQUEST_TIMEOUT_MS,
-    );
+    this.timer = setTimeout(() => {
+      this.disconnect('délai d’attente dépassé');
+    }, REQUEST_TIMEOUT_MS);
   }
 
   private clearTimeout(): void {
-    if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = null;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+
+  private setState(state: ConnectionState): void {
+    this.phase = state;
+    this.handlers.onStateChange?.(state, !!this.pending);
   }
 
   private disconnect(reason: string): void {
-    const socket = this.socket;
-    this.socket = null;
-    this.pending = null;
     this.clearTimeout();
+    this.pending = null;
     this.setState('disconnected');
-    socket?.close();
+    const sock = this.socket;
+    this.socket = null;
+    if (sock && (sock.readyState === 0 || sock.readyState === 1)) {
+      try {
+        sock.close();
+      } catch {
+        // Déjà fermée ou invalide.
+      }
+    }
     this.handlers.onClose(reason);
   }
 }

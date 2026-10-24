@@ -12,6 +12,7 @@
     <!-- Bandeau HUD haut-gauche -->
     <div id="hud" hidden>
       <span id="hud-room"></span>
+      <span id="hud-bots"></span>
       <button id="hud-copy" type="button" title="Copier le lien d'invitation">
         Copier le lien
       </button>
@@ -146,7 +147,29 @@
               <option value="high">Élevée</option>
             </select>
           </label>
+          <label
+            >Nombre de bots
+            <input
+              id="menu-bot-count"
+              type="number"
+              min="0"
+              max="12"
+              step="1"
+              value="5"
+              placeholder="5"
+              aria-describedby="menu-bots-help"
+            />
+          </label>
+          <label
+            >Difficulté des bots
+            <select id="menu-bot-difficulty">
+              <option value="easy">Facile</option>
+              <option value="normal" selected>Normale</option>
+              <option value="hard">Difficile</option>
+            </select>
+          </label>
         </div>
+        <p id="menu-bots-help" class="room-bots-help"></p>
         <button id="menu-create" type="button">Créer</button>
       </fieldset>
 

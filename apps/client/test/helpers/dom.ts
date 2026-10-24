@@ -17,7 +17,11 @@ export class Element extends EventTarget {
   parent: Element | null = null;
   role = '';
   dataset: Record<string, string> = {};
-  style: Record<string, string> = {};
+  style: Record<string, unknown> & { setProperty: (name: string, value: string) => void } = {
+    setProperty: (name: string, value: string) => {
+      this.style[name] = value;
+    },
+  };
   private classes = new Set<string>();
   classList = {
     add: (...names: string[]) => names.forEach((name) => this.classes.add(name)),
@@ -77,9 +81,16 @@ export function installDom() {
         id === 'menu-mode' ||
         id === 'menu-arena-size' ||
         id === 'menu-shape-density' ||
+        id === 'menu-bot-difficulty' ||
         id === 'settings-quality'
           ? new Select()
-          : ['menu-name', 'menu-code', 'menu-max-players', 'settings-grid'].includes(id)
+          : [
+                'menu-name',
+                'menu-code',
+                'menu-max-players',
+                'menu-bot-count',
+                'settings-grid',
+              ].includes(id)
             ? new TextInput()
             : new Element();
       if (id.endsWith('-modal')) node.role = 'dialog';

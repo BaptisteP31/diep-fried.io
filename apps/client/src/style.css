@@ -86,6 +86,13 @@ body {
   color: #fff;
 }
 
+#hud-bots {
+  font-weight: 700;
+  color: #80d8ff;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 #hud-ping {
   color: #ddd;
   font-size: 0.8rem;
@@ -546,6 +553,14 @@ button:disabled {
   line-height: 1.4;
   font-weight: 400;
   color: #ddd;
+}
+
+.room-bots-help {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  font-weight: 400;
+  color: #bbb;
 }
 
 #menu input,

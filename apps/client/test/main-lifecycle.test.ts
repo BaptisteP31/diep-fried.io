@@ -44,6 +44,7 @@ vi.mock('../src/ui/hud', async (importOriginal) => ({
     reset = vi.fn();
     show = vi.fn();
     setRoomCode = vi.fn();
+    setBots = vi.fn();
     setPing = vi.fn();
     setToggles = vi.fn();
     updateSelf = vi.fn();

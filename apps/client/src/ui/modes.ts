@@ -2,8 +2,37 @@ import {
   MAX_PLAYERS_LIMIT,
   resolveModeConfig,
   isModeId,
+  type ModeConfig,
   type RoomOptions,
 } from '@diep-fried/shared';
+
+export type BotDifficulty = 'easy' | 'normal' | 'hard';
+
+export type RoomBotOptions = {
+  botCount?: number;
+  botDifficulty?: BotDifficulty;
+};
+
+export type ClientRoomOptions = RoomOptions & RoomBotOptions;
+
+export type ClientModeConfig = ModeConfig & {
+  bots?: {
+    count: number;
+    difficulty: BotDifficulty;
+  };
+};
+
+export function formatBotDifficulty(difficulty?: BotDifficulty): string {
+  switch (difficulty) {
+    case 'easy':
+      return 'Facile';
+    case 'hard':
+      return 'Difficile';
+    case 'normal':
+    default:
+      return 'Normale';
+  }
+}
 
 /** Catalogue éditorial facultatif : MODE_IDS reste la source des modes disponibles. */
 const DETAILS: Readonly<Record<string, { label: string; rules: string }>> = {
@@ -72,7 +101,11 @@ export function modeDetails(id: string): { label: string; rules: string } {
   const minPlayers = isModeId(id) ? resolveModeConfig(id).match?.minPlayers : undefined;
   return {
     ...details,
-    rules: `${details.rules}${minPlayers ? ` ${minPlayers} joueurs connectés minimum pour démarrer ; partagez le code du salon.` : ''}`,
+    rules: `${details.rules}${
+      minPlayers
+        ? ` ${minPlayers} joueurs connectés minimum pour démarrer (les bots comptent et permettent de lancer la manche seul humain) ; partagez le code du salon.`
+        : ''
+    }`,
   };
 }
 
@@ -81,8 +114,10 @@ export function parseRoomOptions(
   maxPlayers: string,
   arenaSize: string,
   shapeDensity: string,
-): RoomOptions {
-  const options: RoomOptions = {};
+  botCount?: string,
+  botDifficulty?: string,
+): ClientRoomOptions {
+  const options: ClientRoomOptions = {};
   if (maxPlayers !== '') {
     const count = Number(maxPlayers);
     if (!Number.isInteger(count) || count < 1 || count > MAX_PLAYERS_LIMIT) {
@@ -99,6 +134,24 @@ export function parseRoomOptions(
     if (shapeDensity !== 'low' && shapeDensity !== 'normal' && shapeDensity !== 'high')
       throw new Error('Densité de formes invalide.');
     options.shapeDensity = shapeDensity;
+  }
+  if (botCount !== undefined && botCount !== '') {
+    const count = Number(botCount);
+    if (!Number.isInteger(count) || count < 0 || count > 12) {
+      throw new Error('Le nombre de bots doit être un entier de 0 à 12.');
+    }
+    if (options.maxPlayers !== undefined && count > options.maxPlayers - 1) {
+      throw new Error(
+        `Le nombre de bots ne peut pas dépasser ${options.maxPlayers - 1} pour une capacité de ${options.maxPlayers} joueur${options.maxPlayers > 1 ? 's' : ''}.`,
+      );
+    }
+    options.botCount = count;
+  }
+  if (botDifficulty !== undefined && botDifficulty !== '') {
+    if (botDifficulty !== 'easy' && botDifficulty !== 'normal' && botDifficulty !== 'hard') {
+      throw new Error('Difficulté de bots invalide.');
+    }
+    options.botDifficulty = botDifficulty;
   }
   return options;
 }

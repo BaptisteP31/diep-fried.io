@@ -8,6 +8,7 @@ import {
 } from '@diep-fried/shared';
 import { PALETTE, STAT_COLORS } from '../render/palette';
 import { drawSpikes, polygonPath } from '../render/renderer';
+import { formatBotDifficulty, type BotDifficulty } from './modes';
 
 export const STAT_NAMES: Readonly<Record<StatId, string>> = {
   healthRegen: 'Régénération santé',
@@ -40,6 +41,7 @@ export interface HudCallbacks {
 export class GameHud {
   private readonly container: HTMLElement;
   private readonly roomCode: HTMLElement;
+  private readonly botsText: HTMLElement | null;
   private readonly pingText: HTMLElement;
   private readonly autoFireBadge: HTMLElement;
   private readonly autoSpinBadge: HTMLElement;
@@ -76,6 +78,7 @@ export class GameHud {
   constructor(private readonly callbacks: HudCallbacks) {
     this.container = document.getElementById('hud')!;
     this.roomCode = document.getElementById('hud-room')!;
+    this.botsText = document.getElementById('hud-bots');
     this.pingText = document.getElementById('hud-ping')!;
     this.autoFireBadge = document.getElementById('hud-autofire')!;
     this.autoSpinBadge = document.getElementById('hud-autospin')!;
@@ -175,10 +178,26 @@ export class GameHud {
     this.leaderboardList.innerHTML = '';
     this.setPing(null);
     this.setToggles(false, false);
+    this.setBots(null);
   }
 
   setRoomCode(code: string): void {
     this.roomCode.textContent = `Salon ${code}`;
+  }
+
+  setBots(bots?: { count: number; difficulty: BotDifficulty } | null): void {
+    if (!this.botsText) return;
+    if (bots && typeof bots.count === 'number') {
+      if (bots.count > 0) {
+        this.botsText.textContent = `Bots : ${bots.count} · ${formatBotDifficulty(bots.difficulty)}`;
+      } else {
+        this.botsText.textContent = 'Bots : 0';
+      }
+      this.botsText.title = 'Configuration cible des bots du salon';
+    } else {
+      this.botsText.textContent = '';
+      this.botsText.title = '';
+    }
   }
 
   setPing(ms: number | null): void {
