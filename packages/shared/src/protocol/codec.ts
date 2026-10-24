@@ -133,6 +133,18 @@ function readRoomOptions(value: unknown): RoomOptions {
   if (value.shapeDensity !== undefined) {
     options.shapeDensity = readEnum(value.shapeDensity, 'shapeDensity', ['low', 'normal', 'high']);
   }
+  if (value.botCount !== undefined) {
+    const botCount = readInteger(value.botCount, 'botCount', 0);
+    if (botCount > 12) throw new ValidationError('botCount invalide');
+    options.botCount = botCount;
+  }
+  if (value.botDifficulty !== undefined) {
+    options.botDifficulty = readEnum(value.botDifficulty, 'botDifficulty', [
+      'easy',
+      'normal',
+      'hard',
+    ]);
+  }
   return options;
 }
 

@@ -5,3 +5,4 @@ export * from './modes';
 export { createPlaceholderSimulation } from './placeholder';
 export { createSimulation } from './world';
 export { prepareModeConfig } from './map-config';
+export * from './bots';

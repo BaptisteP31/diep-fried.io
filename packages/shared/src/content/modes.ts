@@ -1,4 +1,11 @@
-import type { MatchConfig, ModeConfig, ModeId, RoomOptions, TeamDefinition } from '../model/mode';
+import type {
+  BotDifficulty,
+  MatchConfig,
+  ModeConfig,
+  ModeId,
+  RoomOptions,
+  TeamDefinition,
+} from '../model/mode';
 
 /**
  * Presets de modes et résolution des options de salon.
@@ -101,6 +108,20 @@ export function resolveModeConfig(mode: ModeId, options: RoomOptions = {}): Mode
     MAX_PLAYERS_LIMIT,
     Math.max(1, Math.floor(options.maxPlayers ?? preset.maxPlayers)),
   );
+
+  const defaultDifficulty: BotDifficulty = 'normal';
+  const botDifficulty: BotDifficulty =
+    options.botDifficulty === 'easy' ||
+    options.botDifficulty === 'normal' ||
+    options.botDifficulty === 'hard'
+      ? options.botDifficulty
+      : defaultDifficulty;
+
+  const rawBotCount = options.botCount !== undefined ? options.botCount : 5;
+  const safeCount =
+    typeof rawBotCount === 'number' && Number.isFinite(rawBotCount) ? Math.floor(rawBotCount) : 5;
+  const clampedBotCount = Math.max(0, Math.min(12, Math.min(maxPlayers - 1, safeCount)));
+
   const config: ModeConfig = {
     ...preset,
     mode,
@@ -111,6 +132,10 @@ export function resolveModeConfig(mode: ModeId, options: RoomOptions = {}): Mode
       targetCount: Math.round(
         ((arena.width * arena.height) / 1_000_000) * SHAPES_PER_MILLION_UNITS * density,
       ),
+    },
+    bots: {
+      count: clampedBotCount,
+      difficulty: botDifficulty,
     },
   };
   if (preset.shapes.nest)

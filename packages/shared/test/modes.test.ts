@@ -33,4 +33,32 @@ describe('resolveModeConfig', () => {
     expect(second.map.walls).toEqual([]);
     expect(second.progression.maxLevel).toBe(45);
   });
+
+  it('résout la configuration des bots par défaut et applique les bornes dures', () => {
+    const defaultConfig = resolveModeConfig('ffa');
+    expect(defaultConfig.bots).toEqual({ count: 5, difficulty: 'normal' });
+
+    // count plafonné à maxPlayers - 1
+    const tinyRoom = resolveModeConfig('ffa', { maxPlayers: 3 });
+    expect(tinyRoom.bots).toEqual({ count: 2, difficulty: 'normal' });
+
+    const soloRoom = resolveModeConfig('ffa', { maxPlayers: 1 });
+    expect(soloRoom.bots).toEqual({ count: 0, difficulty: 'normal' });
+
+    // Option 0 désactive
+    const disabled = resolveModeConfig('ffa', { botCount: 0 });
+    expect(disabled.bots).toEqual({ count: 0, difficulty: 'normal' });
+
+    // Borne haute à 12 et difficulté
+    const custom = resolveModeConfig('ffa', {
+      maxPlayers: 20,
+      botCount: 15,
+      botDifficulty: 'hard',
+    });
+    expect(custom.bots).toEqual({ count: 12, difficulty: 'hard' });
+
+    // Valeur négative ou invalide bornée
+    const clampedNeg = resolveModeConfig('ffa', { botCount: -5 });
+    expect(clampedNeg.bots).toEqual({ count: 0, difficulty: 'normal' });
+  });
 });

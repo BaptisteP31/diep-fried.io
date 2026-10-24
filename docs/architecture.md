@@ -81,8 +81,8 @@ Les définitions TypeScript font foi ; cette section résume leur sens. Point d'
 - `SelfState` : `playerId, entityId | null, alive, classId, level, score, levelProgress (0..1), statPoints, stats, statCaps, classChoices, view, respawnTick | null`, ajouts optionnels `spectator` (Survival) et `possessing` (entité IA pilotée, aussi dans `entityId`). `view` = demi-étendue visible en unités monde sur le plus grand axe de l'écran.
 - `DeathInfo` : `playerId, tick, killerName | null, score, level, classId, respawnTick`.
 - `MODE_IDS = [ffa, sandbox, teams2, teams4, maze, domination, tag, ctf, breakout, survival, mothership]` (extensions additives v1).
-- `ModeConfig` : configuration résolue d'un salon (`mode, tickRate, snapshotInterval, arena, maxPlayers, teams, friendlyFire, map { walls, zones }, shapes { targetCount }, progression { maxLevel, startLevel, scoreKeptOnDeath }, respawn { delayTicks }, sandbox { cheats }`), ajouts optionnels `map.objectives` (`ObjectiveSite[]`), `shapes.nest`, `shapes.shinyChance`, `match` (`minPlayers, restartDelayTicks, timeLimitTicks, scoreLimit, shrink?`) et `bosses` (`enabled, firstSpawnTicks, intervalTicks, maxAlive, pool?`).
-- `RoomOptions` : réglages demandables à la création (`maxPlayers?`, `arenaSize?: small|medium|large`, `shapeDensity?: low|normal|high`), bornés par `resolveModeConfig`.
+- `ModeConfig` : configuration résolue d'un salon (`mode, tickRate, snapshotInterval, arena, maxPlayers, teams, friendlyFire, map { walls, zones }, shapes { targetCount }, progression { maxLevel, startLevel, scoreKeptOnDeath }, respawn { delayTicks }, sandbox { cheats }`), ajouts optionnels `map.objectives` (`ObjectiveSite[]`), `shapes.nest`, `shapes.shinyChance`, `match` (`minPlayers, restartDelayTicks, timeLimitTicks, scoreLimit, shrink?`), `bosses` (`enabled, firstSpawnTicks, intervalTicks, maxAlive, pool?`) et `bots` (`{ count, difficulty: 'easy'|'normal'|'hard' }`, voir `docs/bots.md`).
+- `RoomOptions` : réglages demandables à la création (`maxPlayers?`, `arenaSize?: small|medium|large`, `shapeDensity?: low|normal|high`, `botCount?: 0..12`, `botDifficulty?: 'easy'|'normal'|'hard'`), bornés par `resolveModeConfig`.
 
 ### 4.2 Protocole (`packages/shared/src/protocol`)
 
@@ -131,7 +131,8 @@ type SimulationFactory = (options: { config: ModeConfig; seed: number }) => Simu
 - Le serveur possède l'horloge (`FixedStepClock`, rattrapage limité à 5 ticks par appel, retard au-delà abandonné et compté) ; la simulation ne lit jamais l'heure.
 - Ordre recommandé d'un `step()` : intentions et commandes → mouvement/accélération/frottement → tirs → collisions (partition spatiale) → dégâts → morts et récompenses → règles de mode → apparitions (formes, réapparitions).
 - `ModeRules` (`assignTeam`, `spawnPoint`, `canDamage`, `objective?`) isole ce qui varie selon le mode ; tous les `MODE_IDS` sont implémentés. `SimEvent` ajoute `matchPhase`, `objective`, `teamChange`, `possess` et `boss`, ignorés par le serveur actuel (l'état complet est dans `snapshot.match`). `ModeContext.teamSizes?` ajoute un comptage optionnel des camps (morts connectés inclus), sans changer `Simulation`.
-- `createPlaceholderSimulation` : tank immobile par joueur, orientation de visée appliquée, aucune règle de jeu. Il sert à faire tourner serveur et client en attendant la simulation complète, qui le remplace derrière la même interface.
+- `createPlaceholderSimulation` : tank immobile par joueur, orientation de visée appliquée, aucune règle de jeu.
+- `createBotSimulation` : décorateur `SimulationFactory` enveloppant `createSimulation`, activant des bots joueurs synthétiques autoritaires (identifiants positifs réservés `900_001..900_012`, noms `[BOT] ...`, priorité humaine, navigation et objectifs). Le serveur l'injecte par défaut (`apps/server/src/server.ts`). Détails dans `docs/bots.md`.
 - `packages/sim/test/simulation-contract.ts` fournit `describeSimulationContract(nom, fabrique)` : toute implémentation doit passer cette suite (ticks, apparition, bornes de l'arène, `ackSeq`, joueurs inconnus, déterminisme).
 
 ### 4.4 Contenu (`packages/shared/src/content`)
@@ -153,7 +154,7 @@ type SimulationFactory = (options: { config: ModeConfig; seed: number }) => Simu
 | `EMPTY_ROOM_TTL_MS`  | `60000`                        | Durée de vie d'un salon vide             |
 | `DIEP_FRIED_VERSION` | `dev`                          | Version annoncée (`welcome`, `/healthz`) |
 
-`GET /healthz` → `{ status: "ok", protocol, version, uptimeSeconds, rooms, players }`.
+`GET /healthz` → `{ status: "ok", protocol, version, uptimeSeconds, rooms, players }`. Note : `rooms.playerCount` et `/healthz` comptent uniquement les joueurs humains (sièges actifs) ; les bots sont internes à la simulation.
 
 ## 5. Familles et modes implémentés
 

@@ -235,6 +235,36 @@ describe('WebSocket', () => {
     expect(after.entities.some((e) => e.kind === 'shape')).toBe(true);
   });
 
+  it('crée un salon par défaut avec simulation de bots où deux humains peuvent rejoindre', async () => {
+    server = createGameServer({
+      host: '127.0.0.1',
+      port: 0,
+      staticDir: null,
+      maxRooms: 4,
+      emptyRoomTtlMs: 60_000,
+      version: 'test',
+    });
+    const address = await server.listen();
+    const host = `127.0.0.1:${address.port}`;
+
+    const alice = await TestClient.connect(host);
+    alice.send({ t: 'room.create', name: 'Alice', mode: 'ffa', options: {} });
+    const joinedAlice = await alice.next('room.joined');
+    expect(joinedAlice.code).toBeDefined();
+
+    const bob = await TestClient.connect(host);
+    bob.send({ t: 'room.join', code: joinedAlice.code, name: 'Bob' });
+    const joinedBob = await bob.next('room.joined');
+    expect(joinedBob.code).toBe(joinedAlice.code);
+
+    const snapshotAlice = await alice.next('snapshot', (m) => (m.leaderboard?.length ?? 0) >= 6);
+    expect(snapshotAlice.leaderboard).toBeDefined();
+    const names = snapshotAlice.leaderboard!.map((e) => e.name);
+    expect(names).toContain('Alice');
+    expect(names).toContain('Bob');
+    expect(names.some((n) => n.startsWith('[BOT] '))).toBe(true);
+  });
+
   it('refuse un code de salon inconnu et libère la place en quittant', async () => {
     const host = await start();
     const ana = await TestClient.connect(host);

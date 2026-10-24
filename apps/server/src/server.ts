@@ -2,7 +2,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { WebSocketServer } from 'ws';
 import { LIMITS, WS_PATH } from '@diep-fried/shared';
-import { createSimulation, type SimulationFactory } from '@diep-fried/sim';
+import { createBotSimulation, type SimulationFactory } from '@diep-fried/sim';
 import { NETWORK_DEFAULTS, type ServerConfig } from './config';
 import { createNetworkMetrics } from './transport/metrics';
 import { createHttpHandler } from './http';
@@ -18,7 +18,7 @@ export interface GameServer {
 
 export function createGameServer(
   config: ServerConfig,
-  simulationFactory: SimulationFactory = createSimulation,
+  simulationFactory: SimulationFactory = createBotSimulation,
 ): GameServer {
   const startedAt = performance.now();
   const network = { ...NETWORK_DEFAULTS, ...config };

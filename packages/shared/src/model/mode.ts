@@ -92,6 +92,8 @@ export interface ModeConfig {
   match?: MatchConfig;
   /** Apparition périodique des boss classiques ; absent = aucun boss automatique. */
   bosses?: BossConfig;
+  /** Bots joueurs synthétiques (décorateur de simulation) ; absent = aucun bot. */
+  bots?: BotConfig;
 }
 
 export interface NestConfig {
@@ -133,6 +135,13 @@ export interface BossConfig {
   pool?: ClassId[];
 }
 
+export type BotDifficulty = 'easy' | 'normal' | 'hard';
+
+export interface BotConfig {
+  count: number;
+  difficulty: BotDifficulty;
+}
+
 /**
  * Réglages qu'un créateur de salon peut demander. Tous optionnels ; le serveur valide,
  * borne et fusionne avec le preset du mode. Ajouter un réglage = ajouter un champ ici
@@ -142,4 +151,8 @@ export interface RoomOptions {
   maxPlayers?: number;
   arenaSize?: 'small' | 'medium' | 'large';
   shapeDensity?: 'low' | 'normal' | 'high';
+  /** Nombre de bots joueurs (0..12). 0 désactive les bots. */
+  botCount?: number;
+  /** Niveau de difficulté des bots ('easy' | 'normal' | 'hard'). */
+  botDifficulty?: BotDifficulty;
 }

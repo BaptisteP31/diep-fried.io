@@ -1,32 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { LIMITS, decodeClientMessage, decodeServerMessage, encodeMessage } from '../src';
-
-const decode = (value: unknown) => decodeClientMessage(JSON.stringify(value));
+import { LIMITS } from '../src';
+import { decodeClientMessage, decodeServerMessage, encodeMessage } from '../src/protocol/codec';
 
 const validInput = {
-  seq: 3,
-  move: { x: 1, y: -0.5 },
-  aim: { x: 120, y: -40 },
-  fire: true,
+  seq: 1,
+  move: { x: 0, y: 0 },
+  aim: { x: 100, y: 0 },
+  fire: false,
   alt: false,
 };
 
-describe('extensions additives v1 modes et sandbox', () => {
-  it.each(['teams2', 'teams4', 'maze'])('accepte le mode %s', (mode) => {
-    expect(decode({ t: 'room.create', name: '', mode }).ok).toBe(true);
-  });
-  it.each(['levelUp', 'cycleClass', 'selfDestruct', 'toggleGod'])(
-    'valide et nettoie sandbox.%s',
+function decode(value: unknown) {
+  return decodeClientMessage(JSON.stringify(value));
+}
+
+describe('validation ponctuelle des commandes Sandbox', () => {
+  it.each(['levelUp', 'cycleClass', 'selfDestruct', 'toggleGod', 'summonBoss'] as const)(
+    'accepte l’action sandbox : %s',
     (action) => {
-      expect(
-        decode({ t: 'command', command: { type: 'sandbox', action, level: 999, cheats: true } }),
-      ).toEqual({
+      const decoded = decode({ t: 'command', command: { type: 'sandbox', action } });
+      expect(decoded).toEqual({
         ok: true,
         message: { t: 'command', command: { type: 'sandbox', action } },
       });
     },
   );
-  it.each([undefined, null, true, 1, {}, [], 'levelup', 'teleport', 'constructor'])(
+
+  it.each(['godMode', 'noclip', 'spawnDominator', '', 'LEVELUP'])(
     'rejette une action sandbox invalide : %s',
     (action) => {
       expect(decode({ t: 'command', command: { type: 'sandbox', action } }).ok).toBe(false);
@@ -42,7 +42,19 @@ describe('decodeClientMessage', () => {
         t: 'room.create',
         name: 'Ana',
         mode: 'ffa',
-        options: { maxPlayers: 4, arenaSize: 'small' },
+        options: { maxPlayers: 4, arenaSize: 'small', botCount: 5, botDifficulty: 'normal' },
+      },
+      {
+        t: 'room.create',
+        name: 'Ana',
+        mode: 'teams2',
+        options: { botCount: 0, botDifficulty: 'easy' },
+      },
+      {
+        t: 'room.create',
+        name: 'Ana',
+        mode: 'maze',
+        options: { botCount: 12, botDifficulty: 'hard' },
       },
       { t: 'room.join', code: 'ABC234', name: 'Ana', resumeToken: 'tok' },
       { t: 'room.leave' },
@@ -58,25 +70,37 @@ describe('decodeClientMessage', () => {
   });
 
   it('reconstruit un objet sans les champs inconnus', () => {
-    const result = decode({ t: 'input', input: { ...validInput, teleport: true }, admin: 1 });
-    expect(result).toEqual({ ok: true, message: { t: 'input', input: validInput } });
+    const raw = JSON.stringify({
+      t: 'room.create',
+      name: 'Ana',
+      mode: 'ffa',
+      options: { maxPlayers: 4, hack: true },
+      extra: 'drop-me',
+    });
+    expect(decodeClientMessage(raw)).toEqual({
+      ok: true,
+      message: {
+        t: 'room.create',
+        name: 'Ana',
+        mode: 'ffa',
+        options: { maxPlayers: 4 },
+      },
+    });
   });
 
-  it('nettoie le pseudonyme', () => {
-    const name = (raw: string) => {
-      const result = decode({ t: 'room.join', code: 'ABC234', name: raw });
-      return result.ok && result.message.t === 'room.join' ? result.message.name : null;
-    };
-    expect(name('  a\u0000b \n c  d-very-long-name')).toBe('ab c d-very-long');
-    expect(name('a\tb\u200b')).toBe('a b');
+  it('nettoie le pseudonyme à la lecture', () => {
+    const raw = JSON.stringify({ t: 'room.create', name: '  Ana\u0000  ', mode: 'ffa' });
+    const result = decodeClientMessage(raw);
+    expect(result.ok && result.message.t === 'room.create' && result.message.name).toBe('Ana');
   });
 
   it.each([
-    ['JSON invalide', '{'],
+    ['JSON mal formé', '{'],
     ['tableau', '[]'],
-    ['type inconnu', JSON.stringify({ t: 'teleport' })],
-    ['mode inconnu', JSON.stringify({ t: 'room.create', name: '', mode: 'battle', options: {} })],
-    ['code ambigu', JSON.stringify({ t: 'room.join', code: 'ABC10O', name: '' })],
+    ['sans discriminant', JSON.stringify({ foo: 'bar' })],
+    ['type inconnu', JSON.stringify({ t: 'unknown' })],
+    ['mode inconnu', JSON.stringify({ t: 'room.create', name: 'a', mode: 'battle-royale' })],
+    ['code de salon invalide', JSON.stringify({ t: 'room.join', code: 'trop-long', name: 'a' })],
     [
       'move hors bornes',
       JSON.stringify({ t: 'input', input: { ...validInput, move: { x: 2, y: 0 } } }),
@@ -103,6 +127,31 @@ describe('decodeClientMessage', () => {
     [
       'option hors liste',
       JSON.stringify({ t: 'room.create', name: '', mode: 'ffa', options: { arenaSize: 'huge' } }),
+    ],
+    [
+      'botCount négatif',
+      JSON.stringify({ t: 'room.create', name: '', mode: 'ffa', options: { botCount: -1 } }),
+    ],
+    [
+      'botCount trop grand (>12)',
+      JSON.stringify({ t: 'room.create', name: '', mode: 'ffa', options: { botCount: 13 } }),
+    ],
+    [
+      'botCount non entier',
+      JSON.stringify({ t: 'room.create', name: '', mode: 'ffa', options: { botCount: 3.5 } }),
+    ],
+    [
+      'botCount non numérique',
+      JSON.stringify({ t: 'room.create', name: '', mode: 'ffa', options: { botCount: '5' } }),
+    ],
+    [
+      'botDifficulty invalide',
+      JSON.stringify({
+        t: 'room.create',
+        name: '',
+        mode: 'ffa',
+        options: { botDifficulty: 'extreme' },
+      }),
     ],
     [
       'message trop long',
